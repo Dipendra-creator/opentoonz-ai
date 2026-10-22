@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenToonz AI Studio</title>
+<style>
+  :root {
+    --bg: #12131a; --panel: #1b1d27; --panel2: #232634; --line: #2e3242;
+    --text: #e8e9f0; --muted: #9a9db0; --accent: #ff6f91; --accent2: #7c9cff;
+    --ok: #4fd1a5; --warn: #ffc65c; --err: #ff6b6b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { padding: 18px 24px; border-bottom: 1px solid var(--line); display: flex;
+           align-items: center; gap: 12px; }
+  header h1 { margin: 0; font-size: 19px; letter-spacing: .3px; }
+  header .tag { color: var(--muted); font-size: 13px; }
+  header .env { margin-left: auto; font-size: 12px; color: var(--muted); }
+  main { display: grid; grid-template-columns: minmax(320px, 520px) 1fr; gap: 20px;
+         padding: 20px 24px; max-width: 1500px; margin: 0 auto; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; padding: 16px; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+  .card h2 { margin: 0 0 12px; font-size: 15px; color: var(--muted); font-weight: 600;
+             text-transform: uppercase; letter-spacing: .6px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 5px; }
+  input, select, textarea { width: 100%; background: var(--panel2); color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; font: inherit; }
+  textarea { min-height: 300px; resize: vertical; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .styles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .style-opt { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; cursor: pointer;
+               background: var(--panel2); }
+  .style-opt.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .style-opt b { display: block; }
+  .style-opt span { font-size: 12px; color: var(--muted); }
+  .range { display: flex; align-items: center; gap: 10px; }
+  .range input { padding: 0; }
+  .range output { min-width: 64px; text-align: right; font-variant-numeric: tabular-nums; }
+  button { background: var(--accent); color: #1a0f14; border: 0; border-radius: 9px; padding: 11px 16px;
+           font: 600 15px system-ui, sans-serif; cursor: pointer; }
+  button.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); font-weight: 500; }
+  button:disabled { opacity: .5; cursor: default; }
+  .go { width: 100%; margin-top: 16px; }
+  .steps { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+  .step { padding: 5px 11px; border-radius: 999px; background: var(--panel2); color: var(--muted);
+          font-size: 13px; border: 1px solid var(--line); }
+  .step.on { color: var(--text); border-color: var(--accent2); }
+  .step.done { color: var(--ok); border-color: #2f6b58; }
+  .step.err { color: var(--err); border-color: #6b2f2f; }
+  .bar { height: 8px; background: var(--panel2); border-radius: 99px; overflow: hidden; margin: 8px 0 14px; }
+  .bar > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--accent2), var(--accent));
+             transition: width .4s; }
+  .log { background: #0e0f15; border: 1px solid var(--line); border-radius: 10px; height: 340px; overflow: auto;
+         padding: 10px 12px; font: 12.5px/1.55 ui-monospace, Consolas, monospace; }
+  .log div { white-space: pre-wrap; word-break: break-word; }
+  .log .t { color: #5f6377; margin-right: 8px; }
+  .k-tool { color: var(--accent2); } .k-claude { color: var(--text); } .k-info { color: var(--ok); }
+  .k-error, .k-tool_error { color: var(--err); } .k-result { color: var(--warn); }
+  video { width: 100%; border-radius: 10px; background: #000; margin-top: 4px; }
+  .meta { color: var(--muted); font-size: 13px; margin: 8px 0; }
+  .jobs { display: grid; gap: 8px; margin-top: 14px; }
+  .job { display: flex; gap: 10px; align-items: center; padding: 9px 12px; border-radius: 9px;
+         background: var(--panel2); border: 1px solid var(--line); cursor: pointer; }
+  .job.sel { border-color: var(--accent2); }
+  .job .ttl { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pill { font-size: 12px; padding: 2px 9px; border-radius: 99px; border: 1px solid var(--line); }
+  .pill.done { color: var(--ok); } .pill.error, .pill.cancelled { color: var(--err); }
+  .pill.directing, .pill.rendering, .pill.queued { color: var(--warn); }
+  .actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .empty { color: var(--muted); text-align: center; padding: 60px 10px; }
+  img.sheet { width: 100%; border-radius: 10px; margin-top: 10px; }
+  a { color: var(--accent2); }
+</style>
+</head>
+<body>
+<header>
+  <h1>OpenToonz AI Studio</h1>
+  <span class="tag">story &rarr; anime, powered by Claude + OpenToonz</span>
+  <span class="env" id="env"></span>
+</header>
+<main>
+  <section class="card">
+    <h2>New animation</h2>
+    <label for="title">Title</label>
+    <input id="title" value="My Anime" maxlength="80">
+    <label>Style</label>
+    <div class="styles">
+      <div class="style-opt sel" data-style="anime"><b>Japanese anime</b><span>big eyes, cel shading, dramatic reactions</span></div>
+      <div class="style-opt" data-style="cartoon"><b>Desi web-cartoon</b><span>"Not Your Type"-like comedy: big heads, dot eyes</span></div>
+    </div>
+    <label for="story">Story</label>
+    <textarea id="story" placeholder="Paste the story here. Characters, places and what happens. Claude turns it into characters, sets, shots, dialogue and narration."></textarea>
+    <label for="minutes">Length</label>
+    <div class="range"><input id="minutes" type="range" min="0.5" max="10" step="0.5" value="1"><output id="minOut">1 min</output></div>
+    <div class="row">
+      <div><label for="language">Language</label>
+        <select id="language"><option value="en">English</option><option value="en-IN">Indian English</option>
+          <option value="hi">Hindi</option><option value="ja">Japanese</option></select></div>
+      <div><label for="resolution">Resolution</label>
+        <select id="resolution"><option>480p</option><option selected>720p</option><option>1080p</option></select></div>
+    </div>
+    <div class="row">
+      <div><label for="tts">Voices</label>
+        <select id="tts"><option value="edge">Neural voices (online)</option><option value="sapi">Windows voices (offline)</option>
+          <option value="none">No voice, subtitles only</option></select></div>
+      <div><label for="model">Claude model</label>
+        <select id="model"><option value="">CLI default</option><option value="sonnet">Sonnet</option><option value="opus">Opus</option></select></div>
+    </div>
+    <button class="go" id="go">Create animation</button>
+    <div class="jobs" id="jobs"></div>
+  </section>
+  <section class="card" id="panel">
+    <div class="empty" id="empty">Paste a story and press <b>Create animation</b>.<br>Progress, the director's log and the finished video appear here.</div>
+    <div id="detail" hidden>
+      <h2 id="dTitle"></h2>
+      <div class="steps" id="steps"></div>
+      <div class="bar"><i id="bar"></i></div>
+      <div class="meta" id="meta"></div>
+      <video id="video" controls hidden></video>
+      <div class="actions" id="actions"></div>
+      <img class="sheet" id="sheet" hidden alt="Contact sheet of all shots">
+      <h2 style="margin-top:16px">Director log</h2>
+      <div class="log" id="log"></div>
+    </div>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+let style = 'anime', current = null, timer = null, lastLogLen = -1;
+
+document.querySelectorAll('.style-opt').forEach(el => el.onclick = () => {
+  document.querySelectorAll('.style-opt').forEach(o => o.classList.remove('sel'));
+  el.classList.add('sel'); style = el.dataset.style;
+});
+$('minutes').oninput = () => $('minOut').textContent = $('minutes').value + ' min';
+
+fetch('/api/env').then(r => r.json()).then(e => {
+  $('env').textContent = (e.claude ? 'Claude CLI ready' : 'Claude CLI not found') +
+    (e.tcomposer ? ' · tcomposer found' : '');
+});
+
+$('go').onclick = async () => {
+  const body = { story: $('story').value, title: $('title').value || 'My Anime', style,
+    minutes: parseFloat($('minutes').value), language: $('language').value,
+    resolution: $('resolution').value, tts_engine: $('tts').value, model: $('model').value };
+  if (body.story.trim().length < 20) { alert('Please paste a longer story.'); return; }
+  $('go').disabled = true;
+  try {
+    const r = await fetch('/api/jobs', { method: 'POST', headers: {'Content-Type': 'application/json'},
+                                         body: JSON.stringify(body) });
+    if (!r.ok) throw new Error(await r.text());
+    const job = await r.json();
+    select(job.id);
+  } catch (e) { alert('Could not start: ' + e.message); }
+  $('go').disabled = false;
+  loadJobs();
+};
+
+async function loadJobs() {
+  const jobs = await (await fetch('/api/jobs')).json();
+  $('jobs').innerHTML = '';
+  for (const j of jobs) {
+    const d = document.createElement('div');
+    d.className = 'job' + (j.id === current ? ' sel' : '');
+    d.innerHTML = `<span class="ttl"></span><span class="pill ${j.status}">${j.status}</span>`;
+    d.querySelector('.ttl').textContent = j.options.title + ' · ' + j.options.minutes + ' min';
+    d.onclick = () => select(j.id);
+    $('jobs').appendChild(d);
+  }
+}
+
+function select(id) {
+  current = id; lastLogLen = -1;
+  $('empty').hidden = true; $('detail').hidden = false;
+  $('video').hidden = true; $('video').removeAttribute('src'); $('sheet').hidden = true;
+  if (timer) clearInterval(timer);
+  refresh(); timer = setInterval(refresh, 2000);
+  loadJobs();
+}
+
+const ORDER = ['queued', 'directing', 'rendering', 'done'];
+async function refresh() {
+  if (!current) return;
+  const r = await fetch('/api/jobs/' + current);
+  if (!r.ok) return;
+  const j = await r.json();
+  $('dTitle').textContent = j.options.title;
+  const idx = ORDER.indexOf(j.status);
+  $('steps').innerHTML = '';
+  [['directing', 'Claude directs'], ['rendering', 'Render'], ['done', 'Video ready']].forEach(([k, label]) => {
+    const s = document.createElement('span'); s.className = 'step'; s.textContent = label;
+    const ki = ORDER.indexOf(k);
+    if (j.status === 'error' || j.status === 'cancelled') { if (k === 'directing') s.classList.add('err'); }
+    else if (ki < idx || j.status === 'done') s.classList.add('done');
+    else if (ki === idx) s.classList.add('on');
+    $('steps').appendChild(s);
+  });
+  let pct = 0;
+  const p = j.production;
+  if (j.status === 'directing' && p) pct = Math.min(60, 60 * p.total_seconds / Math.max(1, p.target_seconds));
+  if (j.status === 'rendering') pct = 60 + 40 * ((j.render.done || 0) / Math.max(1, j.render.total || 1));
+  if (j.status === 'done') pct = 100;
+  $('bar').style.width = pct + '%';
+  let meta = [];
+  if (p) meta.push(`${p.shots.length} shots · ${p.total_seconds.toFixed(1)} s of ${p.target_seconds} s target`,
+                   `${Object.keys(p.characters).length} characters · ${Object.keys(p.backgrounds).length} sets`);
+  if (j.status === 'rendering' && j.render.total) meta.push(`rendering shot ${j.render.done}/${j.render.total}`);
+  if (j.cost_usd) meta.push('Claude cost $' + j.cost_usd.toFixed(2));
+  if (j.error) meta.push('Error: ' + j.error);
+  if (p) meta.push('Folder: ' + p.folder);
+  $('meta').textContent = meta.join('  ·  ');
+  if (j.status === 'done' && $('video').hidden) {
+    $('video').src = `/media/${j.production_id}/final.mp4?ts=${Date.now()}`; $('video').hidden = false;
+    $('sheet').src = `/media/${j.production_id}/contact_sheet.png?ts=${Date.now()}`;
+    $('sheet').onload = () => $('sheet').hidden = false;
+  }
+  const acts = $('actions'); acts.innerHTML = '';
+  if (['directing', 'rendering', 'queued'].includes(j.status)) {
+    const b = document.createElement('button'); b.className = 'ghost'; b.textContent = 'Cancel';
+    b.onclick = () => fetch(`/api/jobs/${j.id}/cancel`, {method: 'POST'}).then(refresh); acts.appendChild(b);
+  }
+  if (j.production_id && ['done', 'error'].includes(j.status)) {
+    const b = document.createElement('button'); b.className = 'ghost'; b.textContent = 'Render again';
+    b.onclick = () => fetch(`/api/jobs/${j.id}/rerender`, {method: 'POST'}).then(() => { $('video').hidden = true; refresh(); });
+    acts.appendChild(b);
+  }
+  if (j.status === 'done') {
+    const a = document.createElement('a'); a.href = `/media/${j.production_id}/final.mp4`; a.download = j.production_id + '.mp4';
+    a.innerHTML = '<button class="ghost">Download MP4</button>'; acts.appendChild(a);
+  }
+  if (j.log.length !== lastLogLen) {
+    lastLogLen = j.log.length;
+    const box = $('log'); const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
+    box.innerHTML = '';
+    for (const e of j.log) {
+      const d = document.createElement('div'); d.className = 'k-' + e.kind;
+      const t = document.createElement('span'); t.className = 't'; t.textContent = e.t.toFixed(0) + 's';
+      d.appendChild(t); d.appendChild(document.createTextNode((e.kind === 'tool' ? '▶ ' : '') + e.text));
+      box.appendChild(d);
+    }
+    if (atBottom) box.scrollTop = box.scrollHeight;
+  }
+  if (['done', 'error', 'cancelled'].includes(j.status)) { clearInterval(timer); timer = null; loadJobs(); }
+}
+loadJobs();
+</script>
+</body>
+</html>

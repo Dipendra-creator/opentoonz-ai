@@ -1,0 +1,9 @@
+mcp==2.3.0
+pillow==13.0.0
+numpy==2.5.4
+imageio-ffmpeg==0.6.0
+edge-tts==7.3.1
+fastapi==0.159.1
+uvicorn==0.54.0
+pydantic==2.14.1
+anyio==4.15.1

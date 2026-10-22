@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "opentoonz": {
+      "command": "ai/.venv/Scripts/python.exe",
+      "args": ["ai/run_mcp.py"]
+    }
+  }
+}

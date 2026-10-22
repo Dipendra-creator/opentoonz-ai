@@ -41,3 +41,5 @@ ipch/
 
 # generated qm files
 /stuff/config/loc
+
+__pycache__/
