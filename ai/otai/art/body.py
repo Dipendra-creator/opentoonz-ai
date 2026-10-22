@@ -36,6 +36,7 @@ class Kit:
         self.t = 0.0 if view == 'front' else 0.5
         self.warp_on = warp and self.t > 0
         self.lw = p.lw * dpi
+        self.shade_k = 3.2 if d.shading == 'split' else 1.0
         self.skin = self.col['skin']
 
     # -- coordinates -------------------------------------------------------
@@ -79,7 +80,7 @@ class Kit:
         path = self.path(pts, smooth=smooth, tension=tension)
         hh = self.p.hh
         if shade is not None:
-            off = (shade[0] * hh * self.dpi, shade[1] * hh * self.dpi)
+            off = (shade[0] * hh * self.dpi * self.shade_k, shade[1] * hh * self.dpi)
             cv.shaded(path, color, pal.cel_shadow(color, kind), off,
                       self.ink(color) if line else None, self.lw * lw_mul if line else 0)
         else:

@@ -74,9 +74,12 @@ decision yourself and keep working until the production is complete.
 - Lighting: set `grade` on shots so the video has a finished look. `night` for any night
   scene, `dream` for trances, daydreams and temptation (pair it with the `bokeh` backdrop and
   the `hypnotized` emotion: glowing ring eyes), `warm` for mornings, nostalgia and happy
-  endings, `gloom` for sad beats, `neon` for parties. Keep clothes away from neon yellow or
+  endings, `gloom` for sad beats, `neon` for parties, `muted` for ordinary daytime scenes,
+  `spotlight` when one character is suddenly the centre of attention, `dusk` for a slow ending
+  (sunset fading to night over one long shot). Talking-to-camera close-ups work well on the
+  `void` (black) backdrop. Keep clothes away from neon yellow or
   orange in dark grades: bright saturated colours glow there.
-- Camera: mostly `static`; `push_in` on emotional beats, `zoom_snap` + `speedlines` backdrop
+- Camera: mostly `static`; `dutch` (tilted frame) for unease or spotlight moments; `push_in` on emotional beats, `zoom_snap` + `speedlines` backdrop
   for comedic shock, `shake` for impacts, `pan_left/right` on establishing shots.
 - Transitions: `cut` by default (about 80%), `whip` when the location changes, `fade` for time jumps. Use a `title`
   (e.g. "The next morning...") on a short establishing or `plain` backdrop shot for time jumps.

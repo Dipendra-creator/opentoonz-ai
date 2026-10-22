@@ -21,10 +21,10 @@ Action = Literal[
     'walk_in', 'walk_out']
 ShotType = Literal['wide', 'full', 'medium', 'two_shot', 'closeup', 'extreme_closeup']
 CameraMove = Literal['static', 'push_in', 'pull_out', 'pan_left', 'pan_right',
-                     'shake', 'zoom_snap', 'tilt_up']
+                     'shake', 'zoom_snap', 'tilt_up', 'dutch']
 Transition = Literal['cut', 'fade', 'fade_white', 'dissolve', 'flash', 'whip']
 Mood = Literal['auto', 'comedy', 'upbeat', 'warm', 'emotional', 'tense', 'none']
-Grade = Literal['none', 'night', 'dream', 'warm', 'gloom', 'neon']
+Grade = Literal['none', 'night', 'dream', 'warm', 'gloom', 'neon', 'muted', 'spotlight', 'dusk']
 Sfx = Literal['pop', 'boing', 'whoosh', 'swish', 'boom', 'thud', 'ding', 'twinkle', 'scratch',
               'slide_up', 'slide_down', 'drip', 'tap']
 
@@ -43,6 +43,9 @@ class Settings(BaseModel):
     sfx: bool = True
     line: Literal['bold', 'fine'] = Field('bold', description="character outline weight: 'bold' thick ink, "
                                                               "'fine' thin sketch-like lines")
+    shading: Literal['cel', 'split'] = Field('cel', description="character shadows: 'cel' rim shadows, "
+                                                                "'split' hard shadow over the far half")
+    watermark: Optional[str] = Field(None, max_length=60, description='small text burnt into every frame')
 
     @property
     def size(self) -> tuple[int, int]:
@@ -130,8 +133,10 @@ class Shot(BaseModel):
     title: Optional[str] = Field(None, description='on-screen title card text (e.g. "The next day...")')
     grade: Grade = Field('none', description='lighting/colour grade of the finished shot: night (cool, dim), '
                                              'dream (violet trance + light motes), warm (golden hour), '
-                                             'gloom (grey-blue), neon (magenta party); bright saturated '
-                                             'colours such as hypnotized eyes glow')
+                                             'gloom (grey-blue), neon (magenta party), muted (dusty film '
+                                             'look), spotlight (dark outside a circle of light), dusk (fades '
+                                             'from sunset to night over the shot); bright saturated colours '
+                                             'such as hypnotized eyes glow')
     music: Optional[Mood] = Field(None, description='override the production music mood from this shot on')
     notes: str = ''
 

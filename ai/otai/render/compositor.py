@@ -149,7 +149,7 @@ class Compositor:
                 self._draw(canvas, path, m, k, mip, opacity)
         if self._vignette is not None:
             canvas.alpha_composite(self._vignette)
-        canvas = grading.apply(canvas, self.grade, frame)
+        canvas = grading.apply(canvas, self.grade, frame, frame / max(1, self.scene.frame_count - 1))
         for path, m, k, mip, opacity, overlay in items:
             if overlay:
                 self._draw(canvas, path, m, k, mip, opacity)

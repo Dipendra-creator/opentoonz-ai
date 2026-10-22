@@ -144,6 +144,8 @@ def draw_face(th: ToonHead, cv: Canvas) -> None:
     outline = face_outline(th)
     face = VPath().smooth([th.P(x, y) for x, y in outline], closed=True, tension=0.55)
     off = (-0.06 * U - 0.05 * U * th.t, -0.05 * U)
+    if th.d.shading == 'split':  # key light from the side: shadow covers the far half of the face
+        off = (-0.42 * U - 0.08 * U * th.t, -0.03 * U)
     cv.shaded(face, th.skin, th.skin_sh, off, INK, lw * 1.15)
     # nose: a small hook
     nx = th.warp(0.0) + 0.06 * th.t

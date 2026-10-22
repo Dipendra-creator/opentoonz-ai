@@ -30,7 +30,7 @@ INTERIORS = ['bedroom', 'living_room', 'kitchen', 'classroom', 'office', 'cafe',
              'shop', 'school_corridor', 'hospital']
 EXTERIORS = ['street', 'park', 'school_gate', 'rooftop', 'beach', 'village',
              'city', 'forest']
-ABSTRACT = ['speedlines', 'sparkle', 'gloom', 'plain', 'sunburst', 'bokeh']
+ABSTRACT = ['speedlines', 'sparkle', 'gloom', 'plain', 'sunburst', 'bokeh', 'void']
 LOCATIONS = INTERIORS + EXTERIORS + ABSTRACT
 TIMES = ['day', 'evening', 'night']
 
@@ -627,7 +627,7 @@ def draw_location(pl: Plate, d: BackgroundDesign, rnd: random.Random) -> None:
 def _abstract(pl: Plate, loc: str, d: BackgroundDesign, rnd) -> None:
     base = pal.resolve(d.accent_color or d.wall_color, pal.CLOTH, {
         'speedlines': '#FFFFFF', 'sparkle': '#F8C8DC', 'gloom': '#3A2E5A',
-        'plain': '#F2EEE6', 'sunburst': '#FFD66B', 'bokeh': '#171226'}[loc])
+        'plain': '#F2EEE6', 'sunburst': '#FFD66B', 'bokeh': '#171226', 'void': '#050507'}[loc])
     pl.rect(-PLATE_W / 2, -PLATE_H / 2, PLATE_W / 2, PLATE_H / 2, base, line=None)
     if loc == 'speedlines':
         for _ in range(150):

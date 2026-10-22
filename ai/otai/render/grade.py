@@ -40,7 +40,14 @@ GRADES: dict[str, Grade | None] = {
     'gloom': Grade((0.66, 0.70, 0.84), (26, 28, 40), 0.25, 0.40, 0.0),
     # party / hype: dark magenta, saturated, heavy bloom
     'neon': Grade((0.60, 0.42, 0.86), (30, 0, 46), 0.25, 1.25, 1.7),
+    # dusty film look for ordinary scenes: warm, desaturated, soft blacks
+    'muted': Grade((0.96, 0.88, 0.82), (52, 34, 38), 0.14, 0.70, 0.3),
+    # stage light: lit circle (warm) in a dark room, see _spotlight
+    'spotlight': Grade((1.02, 0.95, 0.84), (20, 12, 16), 0.05, 0.85, 0.6),
+    # animated: sunset at the start of the shot, night by the end (see apply)
+    'dusk': Grade((1.0, 0.80, 0.66), (70, 30, 40), 0.18, 0.85, 0.6),
 }
+DUSK_END = Grade((0.30, 0.34, 0.62), (10, 12, 34), 0.25, 0.60, 1.0)
 
 
 def _smoothstep(a: float, b: float, x: np.ndarray) -> np.ndarray:
@@ -89,13 +96,30 @@ def _motes(img: Image.Image, g: Grade, frame: int) -> None:
 
 
 def animated(name: str) -> bool:
-    """True when the grade changes from frame to frame (motes)."""
+    """True when the grade changes from frame to frame (motes, dusk)."""
     g = GRADES.get(name)
-    return bool(g and g.motes)
+    return bool(g and g.motes) or name == 'dusk'
 
 
-def apply(img: Image.Image, name: str, frame: int = 0) -> Image.Image:
-    """Returns ``img`` graded (a new RGBA image), or ``img`` itself for 'none'."""
+def _tone(a: np.ndarray, lum: np.ndarray, g: Grade) -> np.ndarray:
+    out = lum + (a - lum) * g.sat
+    out = out * np.array(g.mult, dtype=np.float32)
+    lift = np.array(g.lift, dtype=np.float32) / 255
+    return out + (lift - out) * g.lift_amount * (1 - lum)
+
+
+@lru_cache(maxsize=4)
+def _spot_mask(w: int, h: int) -> np.ndarray:
+    """1 inside a soft ellipse of light around the lower centre, 0.12 outside."""
+    y, x = np.mgrid[0:h, 0:w].astype(np.float32)
+    d = np.sqrt(((x - w * 0.5) / (w * 0.21)) ** 2 + ((y - h * 0.56) / (h * 0.50)) ** 2)
+    m = 1 - _smoothstep(0.88, 1.06, d)
+    return (0.12 + 0.88 * m)[..., None]
+
+
+def apply(img: Image.Image, name: str, frame: int = 0, progress: float = 0.0) -> Image.Image:
+    """Returns ``img`` graded (a new RGBA image), or ``img`` itself for 'none'.
+    ``progress`` (0..1 through the shot) drives animated grades such as dusk."""
     g = GRADES.get(name)
     if g is None:
         return img
@@ -104,10 +128,12 @@ def apply(img: Image.Image, name: str, frame: int = 0) -> Image.Image:
     sat = (mx - mn) / np.maximum(mx, 1e-4)
     emit = (_smoothstep(0.80, 0.96, mx) * _smoothstep(0.42, 0.68, sat))[..., None]
     lum = (a @ np.array([0.299, 0.587, 0.114], dtype=np.float32))[..., None]
-    out = lum + (a - lum) * g.sat
-    out = out * np.array(g.mult, dtype=np.float32)
-    lift = np.array(g.lift, dtype=np.float32) / 255
-    out = out + (lift - out) * g.lift_amount * (1 - lum)
+    out = _tone(a, lum, g)
+    if name == 'dusk':
+        t = float(_smoothstep(0.0, 1.0, np.float32(min(max(progress, 0.0), 1.0))))
+        out = out * (1 - t) + _tone(a, lum, DUSK_END) * t
+    if name == 'spotlight':
+        out = out * _spot_mask(img.width, img.height)
     out = out * (1 - emit) + a * emit
     if g.glow > 0:
         src = a * emit

@@ -72,6 +72,7 @@ class CharacterDesign:
     height: float = 1.0
     build: str = 'average'          # slim | average | broad
     line: float = 1.0               # outline weight multiplier (0.62 = fine sketch lines)
+    shading: str = 'cel'            # 'cel' rim shadows | 'split' hard shadow over the far half
 
     def resolved(self) -> dict:
         return {

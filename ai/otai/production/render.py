@@ -29,8 +29,23 @@ FADE_FRAMES = 12
 CHUNK = 144
 
 
-def _transition_post(transition: str, total: int, last: bool):
+@lru_cache(maxsize=4)
+def _watermark(text: str, size: tuple[int, int]) -> Image.Image:
+    from PIL import ImageDraw, ImageFont
+    from ..config import font_path
+    px = max(12, size[1] // 40)
+    font = ImageFont.truetype(font_path('latin'), px)
+    img = Image.new('RGBA', size, (0, 0, 0, 0))
+    ImageDraw.Draw(img).text((size[0] - px, size[1] - px), text, font=font, anchor='rs',
+                             fill=(255, 255, 255, 120), stroke_width=max(1, px // 10), stroke_fill=(0, 0, 0, 90))
+    return img
+
+
+def _transition_post(transition: str, total: int, last: bool, watermark: str | None = None):
     def post(frame: int, img: Image.Image) -> Image.Image:
+        if watermark:
+            img = img.copy()
+            img.alpha_composite(_watermark(watermark, img.size))
         a = 0.0
         color = (0, 0, 0)
         if transition in ('fade', 'dissolve') and frame < FADE_FRAMES:
@@ -76,7 +91,8 @@ def _scene(path: str, mtime: float) -> Scene:
 
 
 def render_chunk(tnz: str, out: str, start: int, end: int, size: tuple[int, int],
-                 transition: str, total: int, last: bool, crf: int, freezes=(), grade: str = 'none') -> str:
+                 transition: str, total: int, last: bool, crf: int, freezes=(), grade: str = 'none',
+                 watermark: str | None = None) -> str:
     """Worker: render frames [start, end) of a saved scene to an MP4 chunk.
     Frames inside a freeze window repeat the window's first frame."""
     scene = _scene(tnz, os.path.getmtime(tnz))
@@ -89,7 +105,7 @@ def render_chunk(tnz: str, out: str, start: int, end: int, size: tuple[int, int]
                 src = a
         frames.append(src)
     comp.render_to_video(Path(out), frames=frames,
-                         post=_transition_post(transition, total, last), crf=crf)
+                         post=_transition_post(transition, total, last, watermark), crf=crf)
     return out
 
 
@@ -230,7 +246,7 @@ def render_production(studio: Studio, pid: str, progress: Callable[[dict], None]
             out = seg_dir / ('%s_%05d.mp4' % (s.id, a))
             jobs.append((timings[s.id]['tnz'], str(out), a, min(n, a + CHUNK), size, s.transition, n,
                          s.id == last_id, crf, [tuple(x) for x in timings[s.id].get('freezes', [])],
-                         s.grade))
+                         s.grade, prod.settings.watermark))
     total_frames = sum(timings[s.id]['frames'] for s in prod.shots)
     frames_done = 0
     report(phase='rendering', done=0, total=len(prod.shots), frames=0, total_frames=total_frames)

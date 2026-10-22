@@ -108,7 +108,8 @@ class Studio:
             eye_color=spec.eye_color, top=spec.top, top_color=spec.top_color, bottom=spec.bottom,
             bottom_color=spec.bottom_color, shoe_color=spec.shoe_color,
             accent_color=spec.accent_color, accessories=list(spec.accessories),
-            height=spec.height, build=spec.build, line={'bold': 1.0, 'fine': 0.62}[prod.settings.line])
+            height=spec.height, build=spec.build, line={'bold': 1.0, 'fine': 0.62}[prod.settings.line],
+            shading=prod.settings.shading)
         folder = self.char_dir(pid, spec.name)
         for old in folder.glob('*.png') if folder.exists() else []:
             old.unlink()
@@ -385,6 +386,11 @@ class Studio:
             base.alpha_composite(label, (int((1280 - label.width) / 2), 720 - label.height + 20))
             img = base.convert('RGB')
             tmp.unlink(missing_ok=True)
+        if prod.settings.watermark:
+            from .render import _watermark
+            base = img.convert('RGBA')
+            base.alpha_composite(_watermark(prod.settings.watermark, base.size))
+            img = base.convert('RGB')
         out = self.dir(pid) / 'render' / 'thumbnail.png'
         img.save(out)
         return out

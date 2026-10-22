@@ -99,12 +99,17 @@ def studio_capabilities() -> dict:
         'emotion_auto_actions': director.EMOTION_ACTION,
         'actions': list(get_args(Action)),
         'shot_types': ['wide', 'full', 'medium', 'two_shot', 'closeup', 'extreme_closeup'],
-        'camera_moves': ['static', 'push_in', 'pull_out', 'pan_left', 'pan_right', 'shake', 'zoom_snap', 'tilt_up'],
+        'camera_moves': ['static', 'push_in', 'pull_out', 'pan_left', 'pan_right', 'shake', 'zoom_snap', 'tilt_up',
+                         'dutch'],
         'transitions': ['cut', 'fade', 'fade_white', 'dissolve', 'flash', 'whip (location changes)'],
         'grades': {'none': 'as drawn', 'night': 'cool dim moonlight; screens and glowing eyes bloom',
                    'dream': 'violet trance light, strong glow, drifting light motes',
                    'warm': 'golden hour / nostalgia, a few warm motes', 'gloom': 'grey-blue, flat, sad',
-                   'neon': 'dark magenta party light, saturated, heavy bloom'},
+                   'neon': 'dark magenta party light, saturated, heavy bloom',
+                   'muted': 'dusty, desaturated film look for ordinary scenes',
+                   'spotlight': 'everything dark except a soft circle of light around the centre',
+                   'dusk': 'animated: sunset at the start of the shot, night by the end'},
+        'shading': {'cel': 'thin rim shadows (default)', 'split': 'hard shadow over the far half of face and body'},
         'line_weights': {'bold': 'thick ink outlines (default)', 'fine': 'thin sketch-like outlines'},
         'beat_camera': {'punch_in': 'snap ~120% onto the speaker for punchlines',
                         'freeze': 'freeze-frame + record scratch for the whole beat'},
@@ -143,12 +148,14 @@ def create_production(title: str, story: str = '', style: Literal['anime', 'cart
                       language: str = 'en', target_minutes: float = 2.0,
                       tts_engine: Literal['edge', 'sapi', 'none'] = 'edge',
                       subtitles: bool = True, narrator_voice: Optional[str] = None,
-                      line: Literal['bold', 'fine'] = 'bold') -> dict:
+                      line: Literal['bold', 'fine'] = 'bold', shading: Literal['cel', 'split'] = 'cel',
+                      watermark: Optional[str] = None) -> dict:
     """Creates a production folder. target_minutes is 0.2-10. line: character outline weight
-    ('fine' = thin sketch-like lines; set it before adding characters). Returns production_id."""
+    ('fine' = thin sketch-like lines) and shading ('split' = half-face shadow) apply to characters added
+    afterwards. watermark: small text burnt into every frame. Returns production_id."""
     p = studio().create(title, story=story, style=style, resolution=resolution, language=language,
                         target_minutes=target_minutes, tts_engine=tts_engine, subtitles=subtitles,
-                        narrator_voice=narrator_voice, line=line)
+                        narrator_voice=narrator_voice, line=line, shading=shading, watermark=watermark)
     return {'production_id': p.id, 'folder': str(studio().dir(p.id))}
 
 

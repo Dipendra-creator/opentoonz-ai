@@ -885,6 +885,9 @@ class ShotCompiler:
             s[:n] = st[2] + (sc - st[2]) * r
             x[:n] = st[0] + (cx - st[0]) * r
             y[:n] = st[1] + (cy - st[1]) * r
+        elif move == 'dutch':
+            # tilted frame (unease, spotlight moments); a little tighter so the corners stay on the plate
+            s[:] = sc * (0.94 - 0.03 * sine_in_out(k))
         else:  # static: a slow 'breathing' push keeps the frame alive
             s[:] = sc * (1 - 0.025 * sine_in_out(k))
             self.jump_cuts(beats, x, y, s)
@@ -894,6 +897,8 @@ class ShotCompiler:
         y += 0.0018 * 9 * sc * np.sin(2 * np.pi * t / 6.5 + 1.0)
         shakes = list(self.shakes) + ([(2, 1.0)] if move == 'shake' else [])
         rot = M.track(cam, 'rot')
+        if move == 'dutch':
+            rot += -5.5 - 1.0 * sine_in_out(k)
         for f0, strength in shakes:
             n = min(14, T - f0)
             if n <= 0:
