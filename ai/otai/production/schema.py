@@ -59,7 +59,7 @@ class CharacterSpec(BaseModel):
     shoe_color: str = 'white'
     accent_color: str = 'red'
     accessories: list[Literal['glasses', 'beard', 'mustache', 'bindi', 'earrings', 'cap',
-                              'bow', 'headband', 'freckles', 'tie', 'mask', 'stripe']] = []
+                              'bow', 'headband', 'freckles', 'tie', 'mask', 'stripe', 'sandals']] = []
     height: float = Field(1.0, ge=0.7, le=1.3)
     build: Literal['slim', 'average', 'broad'] = 'average'
     voice: Optional[str] = Field(None, description='edge-tts voice name; auto if empty')

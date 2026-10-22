@@ -426,7 +426,9 @@ def draw_shin(k: Kit, cv: Canvas, side: int, view: str) -> None:
     sc = Sculpt(k, cv)
     shoe_x = x + side * 0.02 * hh
     draw_shoe(k, sc, shoe_x, view, side)
-    hem_y = p.shoe_h * (0.62 if covered else 0.95)
+    sandals = d.top == 'kurta' or 'sandals' in d.accessories
+    # trousers break over shoes, but stop at the ankle above bare feet in sandals
+    hem_y = p.shoe_h * (0.62 if covered and not sandals else 0.95)
     path, left, right = limb_shape(k, x, p.knee_y, hem_y, keys, cap_top=rk)
     sc.add(path, color, 'cloth' if covered else 'skin', shade=(-0.06, 0.0), outline=True)
     if covered:
@@ -460,6 +462,9 @@ def draw_shoe(k: Kit, sc: Sculpt, x: float, view: str, side: int) -> None:
     if base.upper() in ('#F4F4F2', '#FFFFFF', '#F2F2F4'):
         sole_c = '#D9D9E2'
     accent = c['accent']
+    if d.top == 'kurta' or 'sandals' in d.accessories:
+        _sandal(k, sc, x, view, side)
+        return
     if view == 'front':
         w = L * 0.70
         o = side * 0.04 * hh  # toes turned slightly out
@@ -496,6 +501,39 @@ def draw_shoe(k: Kit, sc: Sculpt, x: float, view: str, side: int) -> None:
                 sc.detail([(lx, ly), (lx + 0.07 * L, ly - 0.05 * H)], '#FFFFFF' if base != '#FFFFFF' else '#9A9AA8',
                           0.55, smooth=False)
         sc.detail([(toe - 0.30 * L, H * 0.22), (toe - 0.05 * L, H * 0.32)], None, 0.4, smooth=False)
+
+
+def _sandal(k: Kit, sc: Sculpt, x: float, view: str, side: int) -> None:
+    """Flat chappal: bare foot with toes on a thin sole and a strap."""
+    p, c = k.p, k.col
+    hh = p.hh
+    L, H = p.shoe_len, p.shoe_h
+    strap = c['shoe'] if c['shoe'].upper() not in ('#F4F4F2', '#FFFFFF') else '#8A5A3B'
+    skin = k.skin
+    if view == 'front':
+        w = L * 0.56
+        o = side * 0.03 * hh
+        foot = [(x - w / 2 + o, 0.04 * hh), (x - w * 0.52 + o, H * 0.40), (x - w * 0.30, H * 0.80),
+                (x + w * 0.30, H * 0.80), (x + w * 0.52 + o, H * 0.40), (x + w / 2 + o, 0.04 * hh)]
+        sole = [(x - w * 0.62 + o, 0.0), (x + w * 0.62 + o, 0.0), (x + w * 0.62 + o, 0.045 * hh),
+                (x - w * 0.62 + o, 0.045 * hh)]
+        sc.add(foot, skin, 'skin', shade=(-0.04, -0.02), tension=0.45)
+        sc.add(sole, '#7A5238', 'cloth', shade=None, smooth=False)
+        for i in range(4):
+            tx = x + o + (-0.30 + i * 0.2) * w
+            sc.detail([(tx, 0.05 * hh), (tx, H * 0.22)], None, 0.35, smooth=False)
+        sc.add([(x - w * 0.50, H * 0.30), (x + w * 0.50, H * 0.30), (x + w * 0.46, H * 0.48),
+                (x - w * 0.46, H * 0.48)], strap, 'cloth', shade=None, smooth=False)
+    else:
+        back, toe = x - L * 0.30, x + L * 0.66
+        foot = [(back, 0.04 * hh), (back - 0.02 * L, H * 0.45), (x - 0.02 * L, H * 0.95),
+                (x + 0.25 * L, H * 0.62), (toe - 0.04 * L, H * 0.35), (toe, 0.04 * hh)]
+        sc.add(foot, skin, 'skin', shade=(-0.03, -0.02), tension=0.45)
+        sc.add([(back - 0.04 * L, 0.0), (toe + 0.02 * L, 0.0), (toe + 0.02 * L, 0.045 * hh),
+                (back - 0.04 * L, 0.045 * hh)], '#7A5238', 'cloth', shade=None, smooth=False)
+        sc.add([(x + 0.02 * L, H * 0.30), (x + 0.30 * L, H * 0.30), (x + 0.26 * L, H * 0.62),
+                (x + 0.04 * L, H * 0.80)], strap, 'cloth', shade=None, tension=0.4)
+        sc.detail([(toe - 0.18 * L, 0.05 * hh), (toe - 0.16 * L, H * 0.22)], None, 0.35, smooth=False)
 
 
 def arm_bounds(p, side: int, segment: str) -> tuple[float, float, float, float]:

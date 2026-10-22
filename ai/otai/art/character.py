@@ -1039,6 +1039,9 @@ def drawing_id(manifest: dict, part: str, name: str = '', view: str = 'front') -
         names = _LISTS[part]
         return vi * len(names) + names.index(name) + 1
     if part in _VIEW_PARTS:
+        # rigs built before a part gained a second view only have one drawing
+        if manifest['parts'].get(part, {}).get('count', 2) < 2:
+            return 1
         return vi + 1
     if part.startswith('fore_'):
         return HAND_DRAWINGS.index(name or 'open') + 1
