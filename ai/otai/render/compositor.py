@@ -85,7 +85,8 @@ def _vignette(size: tuple[int, int], strength: float) -> Image.Image:
 class Compositor:
     def __init__(self, scene: Scene, scene_dir: Path | None = None,
                  size: tuple[int, int] | None = None,
-                 background=(255, 255, 255), vignette: float = 0.0, grade: str = 'none') -> None:
+                 background=(255, 255, 255), vignette: float = 0.0, grade: str = 'none',
+                 gpu: bool | None = None) -> None:
         self.scene = scene
         self.scene_dir = Path(scene_dir or (scene.path.parent if scene.path else '.'))
         self.size = size or tuple(scene.camera.res)
@@ -93,6 +94,14 @@ class Compositor:
         self.cache = _PROCESS_CACHE
         self._vignette = _vignette(self.size, vignette) if vignette > 0 else None
         self.grade = grade
+        # GPU (OpenGL) path when available; gpu=False forces the CPU path
+        self._gpu = None
+        if gpu is not False:
+            from . import gpu as gl
+            if gl.context() is not None:
+                self._gpu = gl.GPURenderer(self.size, self.background, self._vignette)
+            elif gpu:
+                raise RuntimeError('no OpenGL 3.3 context for the GPU renderer')
         self._last_sig = None
         self._last_frame: Image.Image | None = None
 
@@ -143,13 +152,18 @@ class Compositor:
             sig += (frame,)
         if sig == self._last_sig and self._last_frame is not None:
             return self._last_frame
+        progress = frame / max(1, self.scene.frame_count - 1)
+        if self._gpu is not None:
+            canvas = self._gpu.render(items, self.cache, self.grade, frame, progress)
+            self._last_sig, self._last_frame = sig, canvas
+            return canvas
         canvas = Image.new('RGBA', self.size, self.background + (255,))
         for path, m, k, mip, opacity, overlay in items:
             if not overlay:
                 self._draw(canvas, path, m, k, mip, opacity)
         if self._vignette is not None:
             canvas.alpha_composite(self._vignette)
-        canvas = grading.apply(canvas, self.grade, frame, frame / max(1, self.scene.frame_count - 1))
+        canvas = grading.apply(canvas, self.grade, frame, progress)
         for path, m, k, mip, opacity, overlay in items:
             if overlay:
                 self._draw(canvas, path, m, k, mip, opacity)
@@ -194,10 +208,10 @@ class Compositor:
     def render_to_video(self, out: Path, frames: range | None = None,
                         post: Callable[[int, Image.Image], Image.Image] | None = None,
                         progress: Callable[[int, int], None] | None = None,
-                        crf: int = 20) -> Path:
+                        crf: int = 20, encoder: str | None = None) -> Path:
         from .video import FrameWriter
         frames = frames if frames is not None else range(self.scene.frame_count)
-        writer = FrameWriter(out, self.size, self.scene.fps, crf=crf)
+        writer = FrameWriter(out, self.size, self.scene.fps, crf=crf, encoder=encoder)
         last_key, last_bytes = None, None
         try:
             for n, fr in enumerate(frames):

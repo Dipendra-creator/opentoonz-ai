@@ -21,7 +21,7 @@ import numpy as np
 from PIL import Image, ImageChops
 
 from ..render.compositor import Compositor
-from ..render.video import SAMPLE_RATE, concat_videos, decode_audio, mux, write_wav
+from ..render.video import SAMPLE_RATE, concat_videos, decode_audio, h264_encoder, mux, write_wav
 from ..tnz.model import Scene
 from .studio import Studio
 
@@ -92,7 +92,7 @@ def _scene(path: str, mtime: float) -> Scene:
 
 def render_chunk(tnz: str, out: str, start: int, end: int, size: tuple[int, int],
                  transition: str, total: int, last: bool, crf: int, freezes=(), grade: str = 'none',
-                 watermark: str | None = None) -> str:
+                 watermark: str | None = None, encoder: str | None = None) -> str:
     """Worker: render frames [start, end) of a saved scene to an MP4 chunk.
     Frames inside a freeze window repeat the window's first frame."""
     scene = _scene(tnz, os.path.getmtime(tnz))
@@ -105,7 +105,7 @@ def render_chunk(tnz: str, out: str, start: int, end: int, size: tuple[int, int]
                 src = a
         frames.append(src)
     comp.render_to_video(Path(out), frames=frames,
-                         post=_transition_post(transition, total, last, watermark), crf=crf)
+                         post=_transition_post(transition, total, last, watermark), crf=crf, encoder=encoder)
     return out
 
 
@@ -218,9 +218,17 @@ def render_production(studio: Studio, pid: str, progress: Callable[[dict], None]
         old.unlink()
     t0 = time.time()
     workers = workers or max(1, (os.cpu_count() or 2) - 1)
+    from ..render import gpu
+    gpu_name = gpu.renderer_name()
+    encoder = h264_encoder()  # decided once so every chunk concatenates cleanly
+    if gpu_name:
+        # the GPU draws frames in a few ms: a few workers keep it fed without
+        # piling GL contexts and NVENC sessions onto one card
+        workers = min(workers, 4)
 
     def report(**kw):
-        state = {'production': pid, 'elapsed': round(time.time() - t0, 1), **kw}
+        state = {'production': pid, 'elapsed': round(time.time() - t0, 1), 'gpu': gpu_name,
+                 'encoder': encoder, **kw}
         status_path.write_text(json.dumps(state), encoding='utf-8')
         if progress:
             progress(state)
@@ -246,7 +254,7 @@ def render_production(studio: Studio, pid: str, progress: Callable[[dict], None]
             out = seg_dir / ('%s_%05d.mp4' % (s.id, a))
             jobs.append((timings[s.id]['tnz'], str(out), a, min(n, a + CHUNK), size, s.transition, n,
                          s.id == last_id, crf, [tuple(x) for x in timings[s.id].get('freezes', [])],
-                         s.grade, prod.settings.watermark))
+                         s.grade, prod.settings.watermark, encoder))
     total_frames = sum(timings[s.id]['frames'] for s in prod.shots)
     frames_done = 0
     report(phase='rendering', done=0, total=len(prod.shots), frames=0, total_frames=total_frames)

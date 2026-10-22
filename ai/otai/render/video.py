@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import wave
+from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
@@ -25,19 +27,36 @@ def _run(args: list[str]) -> subprocess.CompletedProcess:
     return proc
 
 
+@lru_cache(maxsize=1)
+def h264_encoder() -> str:
+    """'h264_nvenc' when the NVIDIA hardware encoder works on this machine
+    (OTAI_NVENC=0 turns it off), else 'libx264'."""
+    if os.environ.get('OTAI_NVENC', '1') == '0':
+        return 'libx264'
+    proc = subprocess.run([ffmpeg_exe(), '-hide_banner', '-loglevel', 'error', '-f', 'lavfi',
+                           '-i', 'color=black:s=256x256:d=0.2', '-c:v', 'h264_nvenc', '-f', 'null', '-'],
+                          capture_output=True, creationflags=_NO_WINDOW)
+    return 'h264_nvenc' if proc.returncode == 0 else 'libx264'
+
+
 class FrameWriter:
-    """Streams RGB frames into an H.264 mp4."""
+    """Streams RGB frames into an H.264 mp4 (NVENC on the GPU when available)."""
 
     def __init__(self, path: Path, size: tuple[int, int], fps: float,
-                 crf: int = 20, preset: str = 'veryfast') -> None:
+                 crf: int = 20, preset: str = 'veryfast', encoder: str | None = None) -> None:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         w, h = size
+        encoder = encoder or h264_encoder()
+        if encoder == 'h264_nvenc':
+            codec = ['-c:v', 'h264_nvenc', '-preset', 'p5', '-tune', 'hq', '-rc', 'vbr',
+                     '-cq', str(crf + 1), '-b:v', '0']
+        else:
+            codec = ['-c:v', 'libx264', '-preset', preset, '-crf', str(crf)]
         self._proc = subprocess.Popen(
             [ffmpeg_exe(), '-hide_banner', '-loglevel', 'error', '-y',
              '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', '%dx%d' % (w, h),
-             '-r', str(fps), '-i', '-', '-an', '-c:v', 'libx264',
-             '-preset', preset, '-crf', str(crf), '-pix_fmt', 'yuv420p',
+             '-r', str(fps), '-i', '-', '-an'] + codec + ['-pix_fmt', 'yuv420p',
              '-movflags', '+faststart', str(self.path)],
             stdin=subprocess.PIPE, stderr=subprocess.PIPE,
             creationflags=_NO_WINDOW)

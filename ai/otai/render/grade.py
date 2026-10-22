@@ -41,7 +41,7 @@ GRADES: dict[str, Grade | None] = {
     # party / hype: dark magenta, saturated, heavy bloom
     'neon': Grade((0.60, 0.42, 0.86), (30, 0, 46), 0.25, 1.25, 1.7),
     # dusty film look for ordinary scenes: warm, desaturated, soft blacks
-    'muted': Grade((0.96, 0.88, 0.82), (52, 34, 38), 0.14, 0.70, 0.3),
+    'muted': Grade((0.96, 0.88, 0.82), (52, 34, 38), 0.14, 0.95, 0.3),
     # stage light: lit circle (warm) in a dark room, see _spotlight
     'spotlight': Grade((1.02, 0.95, 0.84), (20, 12, 16), 0.05, 0.85, 0.6),
     # animated: sunset at the start of the shot, night by the end (see apply)
@@ -75,9 +75,10 @@ def _mote_sprite(r: int, color: tuple[int, int, int]) -> Image.Image:
     return Image.fromarray(sprite, 'RGBA')
 
 
-def _motes(img: Image.Image, g: Grade, frame: int) -> None:
-    w, h = img.size
+def mote_positions(g: Grade, frame: int, w: int, h: int) -> list[tuple[int, int, int, float]]:
+    """(x, y, radius, twinkle) of every light mote on ``frame`` (shared with the GPU path)."""
     rnd = random.Random(7)
+    out = []
     for _ in range(g.motes):
         r = max(2, int(h * rnd.uniform(0.004, 0.012)))
         x0, y0 = rnd.uniform(0, w), rnd.uniform(0, h)
@@ -86,7 +87,12 @@ def _motes(img: Image.Image, g: Grade, frame: int) -> None:
         span_x, span_y = w + 8 * r, h + 8 * r
         x = (x0 + vx * frame) % span_x - 4 * r
         y = (y0 + vy * frame) % span_y - 4 * r
-        twinkle = 0.55 + 0.45 * np.sin(phase + speed * frame)
+        out.append((int(x), int(y), r, float(0.55 + 0.45 * np.sin(phase + speed * frame))))
+    return out
+
+
+def _motes(img: Image.Image, g: Grade, frame: int) -> None:
+    for x, y, r, twinkle in mote_positions(g, frame, *img.size):
         sprite = _mote_sprite(r, g.mote_color)
         if twinkle < 0.98:
             sprite = sprite.copy()
