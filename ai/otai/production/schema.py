@@ -22,7 +22,10 @@ Action = Literal[
 ShotType = Literal['wide', 'full', 'medium', 'two_shot', 'closeup', 'extreme_closeup']
 CameraMove = Literal['static', 'push_in', 'pull_out', 'pan_left', 'pan_right',
                      'shake', 'zoom_snap', 'tilt_up']
-Transition = Literal['cut', 'fade', 'fade_white', 'dissolve', 'flash']
+Transition = Literal['cut', 'fade', 'fade_white', 'dissolve', 'flash', 'whip']
+Mood = Literal['auto', 'comedy', 'upbeat', 'warm', 'emotional', 'tense', 'none']
+Sfx = Literal['pop', 'boing', 'whoosh', 'swish', 'boom', 'thud', 'ding', 'twinkle', 'scratch',
+              'slide_up', 'slide_down', 'drip', 'tap']
 
 
 class Settings(BaseModel):
@@ -35,6 +38,8 @@ class Settings(BaseModel):
     narrator_voice: Optional[str] = None
     subtitles: bool = True
     target_minutes: float = Field(2.0, ge=0.2, le=10.0)
+    music: Mood = Field('auto', description="background music mood; 'auto' picks by style")
+    sfx: bool = True
 
     @property
     def size(self) -> tuple[int, int]:
@@ -102,6 +107,12 @@ class Beat(BaseModel):
     target: Optional[str] = Field(None, description='character to point at / turn to')
     duration: Optional[float] = Field(None, ge=0.2, le=12.0, description='seconds; dialogue/narration use the audio length')
     camera_shake: bool = False
+    camera: Literal['none', 'punch_in', 'freeze'] = Field(
+        'none', description='punch_in: snap ~120% onto the speaker (punchlines); freeze: freeze-frame with a '
+                            'record scratch for the whole beat ("yep, that is me" gag)')
+    text_pop: Optional[str] = Field(None, max_length=40,
+                                    description='1-4 big kinetic words that pop on screen during this beat')
+    sfx: list[Sfx] = Field([], description='extra sound effects at the start of this beat')
 
 
 class Shot(BaseModel):
@@ -114,6 +125,7 @@ class Shot(BaseModel):
     beats: list[Beat] = Field(..., min_length=1)
     transition: Transition = 'cut'
     title: Optional[str] = Field(None, description='on-screen title card text (e.g. "The next day...")')
+    music: Optional[Mood] = Field(None, description='override the production music mood from this shot on')
     notes: str = ''
 
 

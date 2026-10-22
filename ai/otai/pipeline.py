@@ -231,6 +231,9 @@ class JobRunner:
 
         out = render_production(self.studio, job.production_id, progress=progress)
         self.studio.contact_sheet(job.production_id)
+        thumb = self.studio.dir(job.production_id) / 'render' / 'thumbnail.png'
+        if not thumb.exists():
+            self.studio.thumbnail(job.production_id)
         job.output = str(out)
         job.status = 'done'
         self._log(job, 'info', 'Done: %s' % out)

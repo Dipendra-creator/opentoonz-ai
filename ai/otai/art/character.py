@@ -145,8 +145,9 @@ def proportions(d: CharacterDesign) -> Proportions:
         wx = (0.40 if male else 0.33) * build
         hx = (0.40 if male else 0.40) * build
         limb = min(hh, H / 3.0)
-        dims = dict(upper_w=0.15 * limb, fore_w=0.13 * limb, thigh_w=0.23 * limb, shin_w=0.19 * limb,
-                    hand_len=0.26 * limb, shoe_len=0.50 * limb, shoe_h=0.20 * limb, neck_w=0.11 * limb)
+        # stick limbs: constant thin width for both segments of an arm or leg
+        dims = dict(upper_w=0.095 * limb, fore_w=0.095 * limb, thigh_w=0.115 * limb, shin_w=0.115 * limb,
+                    hand_len=0.21 * limb, shoe_len=0.40 * limb, shoe_h=0.16 * limb, neck_w=0.08 * limb)
         lw = 0.030 * u
     else:
         f = {'shoulder': 0.05, 'chest': 0.20, 'waist': 0.34, 'crotch': 0.44, 'knee': 0.71}
@@ -162,13 +163,13 @@ def proportions(d: CharacterDesign) -> Proportions:
     shoulder_y = chin - f['shoulder'] * body - (0.04 if toon else 0.07) * hh
     crotch_y = chin - f['crotch'] * body
     knee_y = chin - f['knee'] * body
-    arm_x = sx * hh - dims['upper_w'] * 0.45
+    arm_x = sx * hh - dims['upper_w'] * (1.3 if toon else 0.45)
     return Proportions(
         H=H, hh=hh, u=u, chin=chin, face_cy=chin + 0.62 * u,
         shoulder_y=shoulder_y, chest_y=chin - f['chest'] * body, waist_y=chin - f['waist'] * body,
         crotch_y=crotch_y, knee_y=knee_y, ankle_y=0.05 * hh,
         shoulder_x=sx * hh, chest_x=sx * hh * 0.92, waist_x=wx * hh, hip_x=hx * hh,
-        arm_x=arm_x, hip_jx=hx * hh * 0.48, hip_jy=crotch_y + 0.06 * hh,
+        arm_x=arm_x, hip_jx=hx * hh * (0.42 if toon else 0.48), hip_jy=crotch_y + 0.06 * hh,
         upper_len=(shoulder_y - (chin - f['waist'] * body)) * (0.62 if toon else 0.95) + 0.02 * hh,
         fore_len=((shoulder_y - (chin - f['waist'] * body)) * 0.48 + 0.02 * hh) if toon
         else (crotch_y - knee_y) * 0.78 + 0.1 * hh,

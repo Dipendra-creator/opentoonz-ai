@@ -213,7 +213,8 @@ async function refresh() {
   $('meta').textContent = meta.join('  ·  ');
   if (j.status === 'done' && $('video').hidden) {
     $('video').src = `/media/${j.production_id}/final.mp4?ts=${Date.now()}`; $('video').hidden = false;
-    $('sheet').src = `/media/${j.production_id}/contact_sheet.png?ts=${Date.now()}`;
+    $('sheet').src = `/media/${j.production_id}/thumbnail.png?ts=${Date.now()}`;
+    $('sheet').onerror = () => { $('sheet').src = `/media/${j.production_id}/contact_sheet.png?ts=${Date.now()}`; };
     $('sheet').onload = () => $('sheet').hidden = false;
   }
   const acts = $('actions'); acts.innerHTML = '';
@@ -229,6 +230,10 @@ async function refresh() {
   if (j.status === 'done') {
     const a = document.createElement('a'); a.href = `/media/${j.production_id}/final.mp4`; a.download = j.production_id + '.mp4';
     a.innerHTML = '<button class="ghost">Download MP4</button>'; acts.appendChild(a);
+    for (const [file, label] of [['thumbnail.png', 'Thumbnail'], ['subtitles.srt', 'Subtitles (SRT)']]) {
+      const l = document.createElement('a'); l.href = `/media/${j.production_id}/${file}`; l.download = file;
+      l.innerHTML = `<button class="ghost">${label}</button>`; acts.appendChild(l);
+    }
   }
   if (j.log.length !== lastLogLen) {
     lastLogLen = j.log.length;

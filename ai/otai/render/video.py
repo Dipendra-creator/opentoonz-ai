@@ -84,12 +84,15 @@ def concat_videos(parts: list[Path], out: Path) -> Path:
     return out
 
 
-def mux(video: Path, audio: Path | None, out: Path) -> Path:
+def mux(video: Path, audio: Path | None, out: Path, loudnorm: bool = True) -> Path:
+    """Joins video and audio; normalises loudness to -14 LUFS / -1.5 dBTP
+    (the level YouTube plays back at)."""
     if audio is None:
         _run(['-i', str(video), '-c', 'copy', str(out)])
     else:
-        _run(['-i', str(video), '-i', str(audio), '-c:v', 'copy', '-c:a', 'aac',
-              '-b:a', '192k', '-shortest', '-movflags', '+faststart', str(out)])
+        af = ['-af', 'loudnorm=I=-14:TP=-1.5:LRA=11', '-ar', str(SAMPLE_RATE)] if loudnorm else []
+        _run(['-i', str(video), '-i', str(audio), '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k'] + af +
+             ['-shortest', '-movflags', '+faststart', str(out)])
     return out
 
 

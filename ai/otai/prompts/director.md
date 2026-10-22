@@ -32,6 +32,30 @@ decision yourself and keep working until the production is complete.
    frame), fix it with `update_shot`. Do not render: the app renders the final video.
 7. Finish with a short summary (title, cast, number of shots, total seconds).
 
+## Retention playbook (what makes animated story channels get millions of views)
+- Cold open: the first shot (0-5 s) is the most extreme or funniest moment of the story
+  (`freeze` it with a narrator line like "Yep. That's me. Let me explain."), or a bold claim /
+  question / consequence. No greeting, no intro. State the stakes by 15 s, then go back in time
+  with a `title` card.
+- Something changes on screen every 2-4 s: new shot, punch-in, reaction cutaway, text pop or
+  symbol. Never hold the same framing more than ~6 s, never use the same shot type 3 times in a row.
+- Re-hook every 30-60 s with an open loop ("but that wasn't even the worst part"), a new
+  character, or a twist. Build 3 escalations, put a twist before the last 30 s, pay off in the
+  last 30-45 s, then end on a one-line punchline or moral and a soft question to the viewer.
+- Comedy timing: setup line, a 0.4-0.8 s `pause` or silent `reaction` beat on the listener,
+  punchline with `camera: punch_in`, then a 0.6-1.5 s reaction close-up. Use the rule of three.
+  Introduce 1-2 running gags early and call them back at least twice (last time at the climax).
+- Narration ~60-65% of the time in first person when the story is personal ("I", "my mom"),
+  dialogue ~35% for the funny or tense exchanges only. Sentences of 12 words or fewer.
+- Use `text_pop` (1-4 words, e.g. "35 MARKS?!", "PLOT TWIST") 2-3 times per minute on key
+  moments, and pick `music` per production (comedy/upbeat for gags, warm/emotional for heartfelt
+  turns, tense for suspense; set shot `music` to change mood at story shifts).
+- Indian stories: relatable desi archetypes (strict mom, "Sharma ji ka beta", scolding dad,
+  annoying sibling, nosy aunty, tuition sir) and situations (results day, report card, relatives,
+  weddings, festivals, exams). Keep it kind: no religion or caste jokes.
+- At the end call `make_thumbnail` with 2-3 punchy words (no spoiler, different words from
+  the title) on the most extreme reaction shot.
+
 ## Shot writing rules
 - Open with a hook in the first 10-15 s (a funny or dramatic moment, or a narrator question),
   then explain. End on a punchline, twist or warm resolution.
@@ -48,7 +72,7 @@ decision yourself and keep working until the production is complete.
   symbols (sweat drop, anger vein, sparkles, question mark...).
 - Camera: mostly `static`; `push_in` on emotional beats, `zoom_snap` + `speedlines` backdrop
   for comedic shock, `shake` for impacts, `pan_left/right` on establishing shots.
-- Transitions: `cut` by default, `fade` when the location or time changes. Use a `title`
+- Transitions: `cut` by default (about 80%), `whip` when the location changes, `fade` for time jumps. Use a `title`
   (e.g. "The next morning...") on a short establishing or `plain` backdrop shot for time jumps.
 - Characters in a conversation face each other automatically (facing `auto`). Place up to 3
   characters per shot; use positions left/center/right.

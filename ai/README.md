@@ -96,9 +96,25 @@ baked to linear keyframes with Ramer-Douglas-Peucker reduction, so the .tnz stay
 - camera: eased push/pull/pan/tilt, zoom snap, breathing drift, decaying shake, vignette
 - lip sync on twos, one frame ahead of the audio, with closed lips on m/b/p
 
-Two looks: `anime` and `cartoon` (desi web cartoon: big googly eyes with eyelid caps, thick
-ink lines, cloud-curl/swoop hair, hard hue-shifted cel shadows, 4-finger hands). The design rules
-came from two research passes, kept in `docs/`.
+Two looks: `anime` (organic limbs) and `cartoon` (desi web cartoon: big googly eyes with eyelid
+caps, thick ink lines, cloud-curl/swoop hair, hard hue-shifted cel shadows, and "half stick man"
+limbs: thin constant-width arms and legs with round joints, mitten hands, small sneakers or
+chappals). The design rules came from research passes kept in `docs/`.
+
+## Sound and editing (retention playbook)
+
+From `docs/research_youtube_retention.md`:
+
+- synthesised cartoon SFX (`otai/audio/sfx.py`) placed automatically on symbol pops, takes, jumps,
+  footsteps, facepalms, shakes and transitions, thinned so the same sound never repeats within
+  20 s and big "boom" hits stay at 2 per video
+- procedural music beds per mood (`otai/audio/music.py`: comedy, upbeat, warm, emotional, tense),
+  side-chain ducked under dialogue; the final mix is loudness-normalised to -14 LUFS
+- jump-cut punch-ins on alternate beats of long static shots, `punch_in` beats for punchlines,
+  `freeze` beats (freeze-frame + record scratch cold opens), `text_pop` kinetic words, `whip`
+  transitions, titles that leave after 2.4 s
+- every render also writes `render/subtitles.srt` and `render/thumbnail.png` (most extreme
+  reaction close-up, boosted colour, up to 3 huge words; `make_thumbnail` tool for custom text)
 
 ## Package layout
 

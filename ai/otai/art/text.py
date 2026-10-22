@@ -48,18 +48,23 @@ def render_caption(text: str, size: tuple[int, int], out: Path, style: str = 'di
     out.parent.mkdir(parents=True, exist_ok=True)
     w, h = size
     fill, outline = {'dialogue': ('#FFFFFF', '#1B1B24'), 'narration': ('#FFE9A8', '#1B1B24'),
-                     'title': ('#FFFFFF', '#1B1B24')}[style]
-    px = int(h * (0.25 if style != 'title' else 0.32))
+                     'title': ('#FFFFFF', '#1B1B24'), 'pop': ('#FFE14D', '#1B1B24')}[style]
+    px = int(h * {'title': 0.32, 'pop': 0.5}.get(style, 0.25))
     script = script_of(text)
     if script == 'devanagari' and not features.check('raqm') and os.name == 'nt':
         render_gdi([(text, w, h, px, fill, outline, str(out))])
         return out
-    kind = {'latin': 'latin' if style != 'title' else 'title', 'cjk': 'cjk', 'devanagari': 'devanagari'}[script]
+    kind = {'latin': 'title' if style in ('title', 'pop') else 'latin', 'cjk': 'cjk',
+            'devanagari': 'devanagari'}[script]
     font = ImageFont.truetype(font_path(kind), px)
     img = Image.new('RGBA', (w, h), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
+    if style == 'pop':  # drop shadow under kinetic text
+        d.multiline_text((w / 2 + px * 0.06, h / 2 + px * 0.08), text, font=font, fill='#00000090', anchor='mm',
+                         align='center', spacing=int(px * 0.2), stroke_width=max(3, px // 7), stroke_fill='#00000090')
     d.multiline_text((w / 2, h / 2), text, font=font, fill=fill, anchor='mm', align='center',
-                     spacing=int(px * 0.2), stroke_width=max(2, px // 9), stroke_fill=outline)
+                     spacing=int(px * 0.2), stroke_width=max(2, px // (7 if style == 'pop' else 9)),
+                     stroke_fill=outline)
     img.save(out)
     return out
 

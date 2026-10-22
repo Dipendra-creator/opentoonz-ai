@@ -91,6 +91,10 @@ ARM_POSES = {
     'flare': (38.0, 60.0, 'palm', False),
 }
 TALK_GESTURES = ['gesture', 'explain', 'chest', 'gesture', 'explain']
+# sound effect played when an emotion symbol pops in
+FX_SFX = {'exclaim': 'boing', 'question': 'pop', 'sparkle': 'twinkle', 'heart': 'pop', 'gloom': 'slide_down',
+          'tears': 'drip', 'sweat': 'drip', 'steam': 'whoosh', 'notes': 'twinkle', 'idea': 'ding',
+          'dots': 'pop', 'vein': 'pop'}
 
 
 @dataclass
@@ -158,6 +162,8 @@ class ShotCompiler:
         beats, total = self.timeline()
         self.total = total
         self.shakes: list[tuple[int, float]] = []
+        self.sfx: list[tuple[int, str]] = []
+        self.freezes: list[tuple[int, int]] = []
         scene = Scene(res=prod.settings.size, fps=self.fps)
         scene.output_path = '$scenefolder/render/%s..png' % shot.id
         self.scene = scene
@@ -182,6 +188,7 @@ class ShotCompiler:
             self.eye_life(st)
             self.secondary(st)
             self.keep_legs(st)
+        self.add_text_pops([(s, ln, b.text_pop) for b, (s, ln) in zip(shot.beats, beats) if b.text_pop])
         self.camera(beats)
         for st in self.chars.values():
             self.motion.copy(st.oid('upper_r'), st.oid('upper_r_back'))
@@ -194,8 +201,14 @@ class ShotCompiler:
             self.add_title(shot.title)
         audio = [[self.speeches[i].path, s] for i, (s, ln) in enumerate(beats)
                  if self.speeches.get(i) and self.speeches[i].path]
+        if shot.transition == 'whip':
+            self.sfx.append((0, 'whoosh'))
+        if shot.camera == 'zoom_snap':
+            self.sfx.append((0, 'swish'))
         timing = {'frames': total, 'fps': self.fps, 'beats': [list(x) for x in beats],
                   'audio': audio, 'transition': shot.transition,
+                  'sfx': sorted([int(f), n] for f, n in self.sfx if 0 <= f < total),
+                  'freezes': [list(x) for x in self.freezes],
                   'seconds': round(total / self.fps, 2), 'keys': n_keys}
         return scene, timing
 
@@ -253,6 +266,9 @@ class ShotCompiler:
         if fx and pop:
             for f in range(start, min(self.total, start + fx_len)):
                 st.fx[f] = fx
+            sound = FX_SFX.get(fx)
+            if sound:
+                self.sfx.append((start + 1, sound))
             # symbol pops in with a springy overshoot
             n = min(fx_len, self.total - start)
             target = np.ones(n)
@@ -289,6 +305,12 @@ class ShotCompiler:
             self.do_action(st, action, s, ln, b.target)
         if b.camera_shake or (st is not None and emotion in ('shocked', 'furious')):
             self.shakes.append((s + 3, 1.0 if emotion != 'furious' else 0.6))
+            self.sfx.append((s + 3, 'boom' if emotion != 'furious' else 'thud'))
+        for name in b.sfx:
+            self.sfx.append((s, name))
+        if b.camera == 'freeze':
+            self.freezes.append((s, ln))
+            self.sfx.append((s, 'scratch'))
 
     def speak(self, st: CharState, sp: Speech, s: int, ln: int, explicit_action: bool) -> None:
         fps = self.fps
@@ -419,6 +441,7 @@ class ShotCompiler:
                     st.look[f] = 'u'
         elif action == 'facepalm':
             self.arm(st, 'r', 'facepalm', s, n, t_in=7)
+            self.sfx.append((s + 7, 'thud'))
             w = pose_weight(n - 6, 3, 10, 0.2, 0.0)
             M.add(head, 'y', s + 6, -0.04 * hh * w)
             M.add(head, 'rot', s + 6, -4.0 * w)
@@ -543,6 +566,8 @@ class ShotCompiler:
         self.motion.add(st.oid('body'), 'sy', s, sy - 1)
         self.motion.add(st.oid('body'), 'sx', s, 1 / np.sqrt(sy) - 1)
         self.motion.add(st.oid('shadow'), 'sc', s, -0.45 * np.clip(y / max(height, 1e-6), 0, 1))
+        self.sfx.append((s + crouch, 'slide_up'))
+        self.sfx.append((s + crouch + launch + air, 'thud'))
         for side in ('l', 'r'):
             sg = 1 if side == 'r' else -1
             w = np.zeros(len(y))
@@ -566,6 +591,7 @@ class ShotCompiler:
         self.motion.add(st.oid('body'), 'sx', s, 1 / np.sqrt(sy) - 1)
         self.motion.add(st.oid('body'), 'y', s, y)
         self.motion.add(st.oid('head'), 'sy', s, (sy - 1) * 0.6)
+        self.sfx.append((s + 2, 'scratch' if big else 'boing'))
         if big:
             self.arm(st, 'l', 'flare', s + 2, n)
             self.arm(st, 'r', 'flare', s + 3, n - 1)
@@ -643,6 +669,8 @@ class ShotCompiler:
         M.add(st.oid('fore_l'), 'rot', s, lag(-10.0 * np.maximum(0, -np.sin(ph)) * ramp, 3))
         M.add(st.oid('fore_r'), 'rot', s, lag(-10.0 * np.maximum(0, np.sin(ph)) * ramp, 3))
         st.walking[s:s + m] = np.maximum(st.walking[s:s + m], ramp)
+        for c in range(6, m - 3, period // 2):
+            self.sfx.append((s + c, 'tap'))
 
     def apply_entrances(self) -> None:
         for sc in self.shot.characters:
@@ -857,6 +885,8 @@ class ShotCompiler:
             y[:n] = st[1] + (cy - st[1]) * r
         else:  # static: a slow 'breathing' push keeps the frame alive
             s[:] = sc * (1 - 0.025 * sine_in_out(k))
+            self.jump_cuts(beats, x, y, s)
+        self.punch_ins(beats, x, y, s)
         t = np.arange(T) / fps
         x += 0.0025 * 16 * sc * np.sin(2 * np.pi * t / 8.0)
         y += 0.0018 * 9 * sc * np.sin(2 * np.pi * t / 6.5 + 1.0)
@@ -872,6 +902,74 @@ class ShotCompiler:
             y[f0:f0 + n] += amp * self.rng.uniform(-1, 1, n)
             rot[f0:f0 + n] += 0.6 * strength * np.exp(-kk / 4.5) * self.rng.uniform(-1, 1, n)
 
+    def _speaker_face(self, b: Beat):
+        st = self.chars.get(b.character) if b.character else None
+        if st is None and self.shot.focus:
+            st = self.chars.get(self.shot.focus)
+        return (st.rig.face_world(), st.rig.head_height) if st else None
+
+    def jump_cuts(self, beats, x, y, s) -> None:
+        """Editor-style punch-ins: on alternate beats of a long static shot,
+        hard-cut to a tighter framing on whoever is talking, so the picture
+        changes every few seconds without needing a new shot."""
+        if self.shot.shot_type not in ('medium', 'two_shot', 'full', 'wide') or len(beats) < 2:
+            return
+        cx, cy, sc = self.cam_base
+        for i, ((b0, n), beat) in enumerate(zip(beats, self.shot.beats)):
+            if i % 2 == 0 or beat.camera == 'punch_in':
+                continue
+            got = self._speaker_face(beat)
+            if got is None:
+                continue
+            (fx, fy), hh = got
+            px, py, ps = self.clamp(cx + (fx - cx) * 0.7, cy + (fy - 0.9 * hh - cy) * 0.6, sc * 0.74)
+            e = min(self.total, b0 + n)
+            x[b0:e] += px - cx
+            y[b0:e] += py - cy
+            s[b0:e] *= ps / sc
+
+    def punch_ins(self, beats, x, y, s) -> None:
+        """Per-beat 'punch_in' for punchlines: snap about 120% onto the speaker."""
+        for (b0, n), beat in zip(beats, self.shot.beats):
+            if beat.camera != 'punch_in':
+                continue
+            got = self._speaker_face(beat)
+            if got is None:
+                continue
+            (fx, fy), hh = got
+            e = min(self.total, b0 + n)
+            w = np.ones(e - b0)
+            w[:4] = ease_out(np.arange(4) / 3)[:len(w[:4])]
+            bx, by, bs = x[b0:e].copy(), y[b0:e].copy(), s[b0:e].copy()
+            tx, ty, ts = self.clamp(fx, fy - 0.25 * hh, float(bs.mean()) / 1.2)
+            x[b0:e] = bx + (tx - bx) * w * 0.8
+            y[b0:e] = by + (ty - by) * w * 0.8
+            s[b0:e] = bs + (ts - bs) * w
+            self.sfx.append((b0, 'swish'))
+
+    def add_text_pops(self, items) -> None:
+        """Kinetic words: camera-attached text that springs in, wobbles, holds."""
+        if not items:
+            return
+        scene = self.scene
+        w, h = scene.camera.res
+        level = 'pop_' + self.shot.id
+        folder = self.scenes_dir / 'assets' / 'captions' / self.shot.id
+        scene.add_level(level, '$scenefolder/assets/captions/%s/%s..png' % (self.shot.id, level),
+                        scene.camera.dpi)
+        idx, col = scene.add_column('text_pops', parent='Camera1')
+        oid = 'Col%d' % (idx + 1)
+        obj = scene.column_object(idx)
+        obj.curve('y').default = scene.camera.size[1] * 0.27
+        for fid, (s, n, text) in enumerate(items, start=1):
+            render_caption(text.upper(), (int(w * 0.9), int(h * 0.26)), folder / ('%s.%04d.png' % (level, fid)), 'pop')
+            hold = min(n, int(1.6 * self.fps))
+            col.hold(s, hold, level, fid)
+            pop = spring_follow(np.ones(hold), 4.5, 0.32, self.fps, x0=0.25)
+            self.motion.add(oid, 'sc', s, pop - 1.0)
+            self.motion.add(oid, 'rot', s, -4.0 + 3.0 * np.exp(-np.arange(hold) / 6.0) * np.sin(np.arange(hold) / 1.6))
+            self.sfx.append((s, 'pop'))
+
     # ------------------------------------------------------------------
     # captions and titles
     # ------------------------------------------------------------------
@@ -883,7 +981,8 @@ class ShotCompiler:
         cap_h = int(h * 0.2)
         level = 'cap_' + self.shot.id
         folder = self.scenes_dir / 'assets' / 'captions' / self.shot.id
-        for old in folder.glob('*.png') if folder.exists() else []:
+        # only this level's frames: text pops and titles share the folder
+        for old in folder.glob(level + '.*.png') if folder.exists() else []:
             old.unlink()
         scene.add_level(level, '$scenefolder/assets/captions/%s/%s..png' % (self.shot.id, level),
                         scene.camera.dpi)
@@ -916,8 +1015,10 @@ class ShotCompiler:
         render_caption(text, (w, int(h * 0.3)), folder / ('%s.0001.png' % level), 'title')
         scene.add_level(level, '$scenefolder/assets/captions/%s/%s..png' % (self.shot.id, level),
                         scene.camera.dpi)
-        _, col = scene.add_column('title', parent='Camera1')
-        col.hold(0, self.total, level, 1)
+        idx, col = scene.add_column('title', parent='Camera1')
+        # upper third, on screen for the first ~2.4 s only
+        scene.column_object(idx).curve('y').default = scene.camera.size[1] * 0.30
+        col.hold(0, min(self.total, int(2.4 * self.fps)), level, 1)
 
 
 def _stress_events(env: np.ndarray, fps: float) -> list[int]:

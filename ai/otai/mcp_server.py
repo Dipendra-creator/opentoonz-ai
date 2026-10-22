@@ -100,7 +100,15 @@ def studio_capabilities() -> dict:
         'actions': list(get_args(Action)),
         'shot_types': ['wide', 'full', 'medium', 'two_shot', 'closeup', 'extreme_closeup'],
         'camera_moves': ['static', 'push_in', 'pull_out', 'pan_left', 'pan_right', 'shake', 'zoom_snap', 'tilt_up'],
-        'transitions': ['cut', 'fade', 'fade_white', 'dissolve', 'flash'],
+        'transitions': ['cut', 'fade', 'fade_white', 'dissolve', 'flash', 'whip (location changes)'],
+        'beat_camera': {'punch_in': 'snap ~120% onto the speaker for punchlines',
+                        'freeze': 'freeze-frame + record scratch for the whole beat'},
+        'beat_text_pop': '1-4 big kinetic words that spring onto the screen (2-3 per minute)',
+        'music_moods': ['auto', 'comedy', 'upbeat', 'warm', 'emotional', 'tense', 'none'],
+        'sfx': ['pop', 'boing', 'whoosh', 'swish', 'boom', 'thud', 'ding', 'twinkle', 'scratch',
+                'slide_up', 'slide_down', 'drip', 'tap'],
+        'automatic': 'symbols, takes, jumps, walks, shakes and transitions add their own sound effects; '
+                     'music is ducked under dialogue; long static shots get jump-cut punch-ins',
         'positions': 'float -1..1 (stage left..right) or far_left/left/center/right/far_right',
         'character_options': {
             'hair_style': ['short', 'spiky', 'curly', 'messy', 'undercut', 'long', 'ponytail', 'bob',
@@ -215,6 +223,15 @@ async def contact_sheet(production_id: str) -> list:
     """Thumbnail grid of the middle frame of every shot."""
     path = await _bg(studio().contact_sheet, production_id)
     return [str(path), _image(path, 1280)]
+
+
+@mcp.tool()
+async def make_thumbnail(production_id: str, text: str = '', shot_id: Optional[str] = None,
+                         at: float = 0.55) -> list:
+    """YouTube thumbnail (1280x720): picks the most extreme reaction close-up unless shot_id is
+    given, boosts colour and adds up to 3 huge words (text; defaults to the title)."""
+    path = await _bg(studio().thumbnail, production_id, shot_id, text, at)
+    return [str(path), _image(path, 960)]
 
 
 @mcp.tool()

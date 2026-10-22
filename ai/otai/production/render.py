@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Callable
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageChops
 
 from ..render.compositor import Compositor
 from ..render.video import SAMPLE_RATE, concat_videos, decode_audio, mux, write_wav
@@ -39,6 +39,14 @@ def _transition_post(transition: str, total: int, last: bool):
             a, color = 1 - frame / FADE_FRAMES, (255, 255, 255)
         elif transition == 'flash' and frame < 3:
             a, color = 0.9 - 0.3 * frame, (255, 255, 255)
+        elif transition == 'whip' and frame < 6:
+            # fast horizontal slide-in with motion blur
+            off = int(img.width * 0.35 * (1 - frame / 6) ** 2)
+            acc = None
+            for k in range(5):
+                shifted = ImageChops.offset(img, off + k * max(1, off // 6), 0)
+                acc = shifted if acc is None else Image.blend(acc, shifted, 1 / (k + 1))
+            img = acc
         if last and frame >= total - FADE_FRAMES:
             a = max(a, (frame - (total - FADE_FRAMES)) / FADE_FRAMES)
             color = (0, 0, 0)
@@ -68,23 +76,75 @@ def _scene(path: str, mtime: float) -> Scene:
 
 
 def render_chunk(tnz: str, out: str, start: int, end: int, size: tuple[int, int],
-                 transition: str, total: int, last: bool, crf: int) -> str:
-    """Worker: render frames [start, end) of a saved scene to an MP4 chunk."""
+                 transition: str, total: int, last: bool, crf: int, freezes=()) -> str:
+    """Worker: render frames [start, end) of a saved scene to an MP4 chunk.
+    Frames inside a freeze window repeat the window's first frame."""
     scene = _scene(tnz, os.path.getmtime(tnz))
     comp = Compositor(scene, Path(tnz).parent, size=size, vignette=0.22)
-    comp.render_to_video(Path(out), frames=range(start, end),
+    frames = []
+    for f in range(start, end):
+        src = f
+        for a, n in freezes:
+            if a <= f < a + n:
+                src = a
+        frames.append(src)
+    comp.render_to_video(Path(out), frames=frames,
                          post=_transition_post(transition, total, last), crf=crf)
     return out
 
 
+def _srt_time(seconds: float) -> str:
+    ms = int(round(seconds * 1000))
+    return '%02d:%02d:%02d,%03d' % (ms // 3600000, ms // 60000 % 60, ms // 1000 % 60, ms % 1000)
+
+
+def write_srt(prod, timings: dict, out: Path) -> Path:
+    """Subtitles for YouTube (upload alongside the video)."""
+    from ..art.text import chunk_caption
+    fps = prod.settings.fps
+    lines, offset, k = [], 0, 0
+    for shot in prod.shots:
+        t = timings[shot.id]
+        for beat, (s, n) in zip(shot.beats, t['beats']):
+            if beat.kind not in ('dialogue', 'narration') or not beat.text.strip():
+                continue
+            chunks = chunk_caption(beat.text)
+            total_chars = sum(len(c) for c in chunks) or 1
+            a = (offset + s) / fps
+            span = n / fps
+            for c in chunks:
+                d = span * len(c) / total_chars
+                k += 1
+                speaker = ('%s: ' % beat.character) if beat.kind == 'dialogue' and beat.character else ''
+                lines.append('%d\n%s --> %s\n%s%s\n' % (k, _srt_time(a), _srt_time(a + d), speaker,
+                                                         c.replace('\n', ' ')))
+                a += d
+        offset += t['frames']
+    out.write_text('\n'.join(lines), encoding='utf-8')
+    return out
+
+
+def _mood(prod, shot) -> str:
+    mood = shot.music or prod.settings.music
+    if mood == 'auto':
+        mood = 'comedy' if prod.settings.style == 'cartoon' else 'warm'
+    return mood
+
+
 def mix_audio(studio: Studio, pid: str, shot_frames: dict[str, int]) -> Path | None:
+    """Dialogue + planned sound effects + a mood music bed ducked under the
+    voices. Loudness normalisation happens when muxing (-14 LUFS)."""
+    from ..audio import music, sfx
     prod = studio.load(pid)
     fps = prod.settings.fps
     total_frames = sum(shot_frames[s.id] for s in prod.shots)
     n = int(total_frames / fps * SAMPLE_RATE) + SAMPLE_RATE
-    mixbuf = np.zeros(n, dtype=np.float32)
+    voice = np.zeros(n, dtype=np.float32)
+    effects = np.zeros(n, dtype=np.float32)
+    bed = np.zeros(n, dtype=np.float32)
+    events = []
     offset = 0
-    any_audio = False
+    runs: list[list] = []  # [mood, start_frame, end_frame]
     for shot in prod.shots:
         timing = prod.timings.get(shot.id, {})
         for path, start in timing.get('audio', []):
@@ -93,10 +153,34 @@ def mix_audio(studio: Studio, pid: str, shot_frames: dict[str, int]) -> Path | N
             pcm = decode_audio(Path(path))
             a = int((offset + start) / fps * SAMPLE_RATE)
             b = min(n, a + len(pcm))
-            mixbuf[a:b] += pcm[:b - a]
-            any_audio = True
+            voice[a:b] += pcm[:b - a]
+        for f, name in timing.get('sfx', []):
+            events.append(((offset + f) / fps, name))
+        mood = _mood(prod, shot)
+        if runs and runs[-1][0] == mood:
+            runs[-1][2] = offset + shot_frames[shot.id]
+        else:
+            runs.append([mood, offset, offset + shot_frames[shot.id]])
         offset += shot_frames[shot.id]
-    if not any_audio:
+    if prod.settings.sfx:
+        for t, name in sfx.plan_sfx(events):
+            clip = sfx.make(name) * sfx.GAIN.get(name, 0.5) * 0.55
+            a = int(t * SAMPLE_RATE)
+            b = min(n, a + len(clip))
+            if a < n:
+                effects[a:b] += clip[:b - a]
+    cache = studio.root.parent / 'audio_cache'
+    for mood, f0, f1 in runs:
+        if mood == 'none':
+            continue
+        seg = music.bed(mood, (f1 - f0) / fps + 0.5, cache, fade=1.2)
+        a = int(f0 / fps * SAMPLE_RATE)
+        b = min(n, a + len(seg))
+        bed[a:b] += seg[:b - a]
+    if np.any(bed):
+        bed = music.duck(bed * 0.26, voice + 0.5 * effects)
+    mixbuf = voice + effects + bed
+    if not np.any(mixbuf):
         return None
     peak = float(np.abs(mixbuf).max()) or 1.0
     if peak > 0.98:
@@ -145,7 +229,7 @@ def render_production(studio: Studio, pid: str, progress: Callable[[dict], None]
         for a in range(0, n, CHUNK):
             out = seg_dir / ('%s_%05d.mp4' % (s.id, a))
             jobs.append((timings[s.id]['tnz'], str(out), a, min(n, a + CHUNK), size, s.transition, n,
-                         s.id == last_id, crf))
+                         s.id == last_id, crf, [tuple(x) for x in timings[s.id].get('freezes', [])]))
     total_frames = sum(timings[s.id]['frames'] for s in prod.shots)
     frames_done = 0
     report(phase='rendering', done=0, total=len(prod.shots), frames=0, total_frames=total_frames)
@@ -163,6 +247,7 @@ def render_production(studio: Studio, pid: str, progress: Callable[[dict], None]
     audio = mix_audio(studio, pid, {s.id: timings[s.id]['frames'] for s in prod.shots})
     final = studio.dir(pid) / 'render' / 'final.mp4'
     mux(video, audio, final)
+    write_srt(studio.load(pid), timings, studio.dir(pid) / 'render' / 'subtitles.srt')
     report(phase='done', done=len(prod.shots), total=len(prod.shots), output=str(final),
            frames=total_frames, total_frames=total_frames)
     return final

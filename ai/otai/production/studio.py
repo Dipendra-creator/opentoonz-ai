@@ -344,6 +344,45 @@ class Studio:
         sheet.save(out)
         return out
 
+    def thumbnail(self, pid: str, shot_id: str | None = None, text: str = '', at: float = 0.55) -> Path:
+        """YouTube thumbnail: the most extreme reaction close-up, boosted colour,
+        and up to 3 huge words."""
+        from PIL import ImageEnhance
+        from ..art.text import render_caption
+        prod = self.load(pid)
+        if not prod.shots:
+            raise ValueError('production has no shots')
+        strong = {'shocked': 5, 'surprised': 4, 'scared': 4, 'furious': 4, 'crying': 4, 'angry': 3,
+                  'love': 3, 'embarrassed': 3, 'laugh': 2, 'excited': 2}
+        close = {'extreme_closeup': 3, 'closeup': 2, 'medium': 1}
+
+        def score(s):
+            emo = max([strong.get(b.emotion or '', 0) for b in s.beats] +
+                      [strong.get(c.emotion, 0) for c in s.characters])
+            return emo * 2 + close.get(s.shot_type, 0) + (1 if s.characters else -5)
+
+        shot = next((s for s in prod.shots if s.id == shot_id), None) if shot_id else max(prod.shots, key=score)
+        scene, timing = self.scene_for(prod, shot)
+        for col in scene.columns:  # no subtitles or titles on a thumbnail
+            if col.name in ('captions', 'title', 'text_pops'):
+                col.cells.clear()
+        frame = min(timing['frames'] - 1, int(at * (timing['frames'] - 1)))
+        img = Compositor(scene, scene.path.parent, size=(1280, 720), vignette=0.35).render(frame).convert('RGB')
+        img = ImageEnhance.Color(img).enhance(1.3)
+        img = ImageEnhance.Contrast(img).enhance(1.1)
+        words = ' '.join((text or prod.settings.title).split()[:3]).upper()
+        if words:
+            tmp = self.dir(pid) / 'render' / '_thumb_text.png'
+            render_caption(words, (1180, 300), tmp, 'pop')
+            label = Image.open(tmp).convert('RGBA').rotate(4, expand=True, resample=Image.Resampling.BICUBIC)
+            base = img.convert('RGBA')
+            base.alpha_composite(label, (int((1280 - label.width) / 2), 720 - label.height + 20))
+            img = base.convert('RGB')
+            tmp.unlink(missing_ok=True)
+        out = self.dir(pid) / 'render' / 'thumbnail.png'
+        img.save(out)
+        return out
+
     def summary(self, pid: str) -> dict:
         prod = self.load(pid)
         return {

@@ -382,6 +382,8 @@ def leg_bounds(p, side: int, segment: str) -> tuple[float, float, float, float]:
 
 
 def draw_thigh(k: Kit, cv: Canvas, side: int, view: str = 'front') -> None:
+    if k.toon:
+        return stick_thigh(k, cv, side, view)
     d, p, c = k.d, k.p, k.col
     hh = p.hh
     x, y0, y1 = side * p.hip_jx, p.hip_jy + 0.14 * hh, p.knee_y
@@ -417,6 +419,8 @@ def draw_thigh(k: Kit, cv: Canvas, side: int, view: str = 'front') -> None:
 
 
 def draw_shin(k: Kit, cv: Canvas, side: int, view: str) -> None:
+    if k.toon:
+        return stick_shin(k, cv, side, view)
     d, p, c = k.d, k.p, k.col
     hh = p.hh
     x = side * p.hip_jx
@@ -559,6 +563,8 @@ def _elbow_radius(d, p) -> float:
 
 
 def draw_upper_arm(k: Kit, cv: Canvas, side: int, length_mul: float = 1.0) -> None:
+    if k.toon:
+        return stick_upper(k, cv, side, length_mul)
     d, p, c = k.d, k.p, k.col
     hh = p.hh
     x, y0 = side * p.arm_x, p.shoulder_y
@@ -600,6 +606,8 @@ def draw_upper_arm(k: Kit, cv: Canvas, side: int, length_mul: float = 1.0) -> No
 
 
 def draw_forearm(k: Kit, cv: Canvas, side: int, hand: str) -> None:
+    if k.toon:
+        return stick_fore(k, cv, side, hand)
     d, p, c = k.d, k.p, k.col
     hh = p.hh
     x = side * p.arm_x
@@ -715,6 +723,130 @@ def draw_hand(k: Kit, sc: Sculpt, x: float, y: float, thumb: int, kind: str, wri
         sc.add([(x + thumb * pw * 0.58, y - hl * 0.12), (x + thumb * pw * 0.30, y - hl * 0.38),
                 (x - thumb * pw * 0.05, y - hl * 0.42), (x - thumb * pw * 0.02, y - hl * 0.30),
                 (x + thumb * pw * 0.30, y - hl * 0.24)], skin, 'skin', shade=None, tension=0.5)
+
+
+# --------------------------------------------------------------------------
+# Stick ("noodle") limbs for the web-cartoon style
+# --------------------------------------------------------------------------
+# Web cartoons draw a full character for head and torso but keep arms and
+# legs as thin sticks of constant width. Every segment is a capsule with the
+# same radius, so joints are perfect circles: the parent segment leaves its
+# lower end unoutlined and the child outlines its upper end, which makes a
+# straight limb seamless and a bent one show a clean round elbow or knee.
+
+
+def _capsule(k: Kit, x: float, y0: float, y1: float, r: float, top_line: bool = True,
+             bottom_line: bool = True):
+    """Vertical capsule from (x, y0) down to (x, y1). Returns (fill path,
+    outline polylines) honouring which round ends get a line."""
+    left = [(x - r, y0), (x - r, y1)]
+    right = [(x + r, y1), (x + r, y0)]
+    bottom = _arc(x, y1, r, math.pi, 2 * math.pi, 16)
+    top = _arc(x, y0, r, 0.0, math.pi, 16)
+    pts = left + bottom[1:-1] + right + top[1:-1]
+    path = VPath().poly([k.P(*q) for q in pts])
+    lines = [left, right]
+    if bottom_line:
+        lines.append(bottom)
+    if top_line:
+        lines.append(top)
+    return path, lines
+
+
+def _stick(sc: 'Sculpt', k: Kit, x, y0, y1, r, color, kind, top_line=True, bottom_line=True,
+           shade=(-0.035, 0.0)):
+    path, lines = _capsule(k, x, y0, y1, r, top_line, bottom_line)
+    sc.add(path, color, kind, shade=shade, outline=False)
+    for ln in lines:
+        sc.edge(ln, color, smooth=False)
+    return path
+
+
+def stick_thigh(k: Kit, cv: Canvas, side: int, view: str) -> None:
+    d, p, c = k.d, k.p, k.col
+    hh = p.hh
+    x, y0, y1 = side * p.hip_jx, p.hip_jy + 0.10 * hh, p.knee_y
+    r = p.thigh_w / 2
+    covered, frac = _covered(d)
+    sc = Sculpt(k, cv)
+    _stick(sc, k, x, y0, y1, r, c['bottom'] if covered else k.skin, 'cloth' if covered else 'skin',
+           top_line=False, bottom_line=False)
+    if frac and not covered:  # shorts: a flared leg opening around the top of the thigh
+        yb = y0 + (y1 - y0) * frac
+        sc.add([(x - r * 1.6, y0), (x + r * 1.6, y0), (x + r * 2.1, yb), (x - r * 2.1, yb)],
+               c['bottom'], 'cloth', shade=(-0.04, 0.0), smooth=False)
+    sc.finish()
+
+
+def stick_shin(k: Kit, cv: Canvas, side: int, view: str) -> None:
+    d, p, c = k.d, k.p, k.col
+    hh = p.hh
+    x = side * p.hip_jx
+    r = p.shin_w / 2
+    covered, _ = _covered(d)
+    sandals = d.top == 'kurta' or 'sandals' in d.accessories
+    sc = Sculpt(k, cv)
+    draw_shoe(k, sc, x + side * 0.01 * hh, view, side)
+    ankle = p.shoe_h * 0.75
+    color = c['bottom'] if covered else k.skin
+    _stick(sc, k, x, p.knee_y, ankle, r, color, 'cloth' if covered else 'skin', bottom_line=False)
+    if covered and not sandals:
+        hem = p.shoe_h * 0.55
+        sc.add([(x - r * 1.05, hem + 0.16 * hh), (x + r * 1.05, hem + 0.16 * hh), (x + r * 1.45, hem),
+                (x - r * 1.45, hem)], color, 'cloth', shade=(-0.035, 0.0), smooth=False)
+    elif not covered and (d.bottom == 'skirt' or d.top in ('school_uniform', 'dress')):
+        top = p.knee_y - (p.knee_y - ankle) * 0.55
+        sc.add([(x - r * 1.15, top), (x + r * 1.15, top), (x + r * 1.15, ankle - 0.02 * hh),
+                (x - r * 1.15, ankle - 0.02 * hh)], '#F4F4F8', 'cloth', shade=(-0.035, 0.0), smooth=False)
+    sc.finish()
+
+
+def stick_upper(k: Kit, cv: Canvas, side: int, length_mul: float = 1.0) -> None:
+    d, p, c = k.d, k.p, k.col
+    hh = p.hh
+    x, y0 = side * p.arm_x, p.shoulder_y - 0.02 * hh
+    y1 = p.shoulder_y - p.upper_len * length_mul
+    r = p.upper_w / 2
+    up, _ = _sleeves(d)
+    tc = c['top']
+    sc = Sculpt(k, cv)
+    # shoulder end without a line: it tucks into the torso of the same colour
+    _stick(sc, k, x, y0, y1, r, tc if up == 'long' else k.skin, 'cloth' if up == 'long' else 'skin',
+           top_line=False, bottom_line=False)
+    if up == 'short':
+        # rounded sleeve that grows out of the shoulder and flares a little
+        cut = y0 - p.upper_len * 0.38
+        sleeve = [(x - r * 1.35, y0 + 0.07 * hh), (x, y0 + 0.11 * hh), (x + r * 1.35, y0 + 0.07 * hh),
+                  (x + r * 2.05, cut + 0.02 * hh), (x, cut - 0.015 * hh), (x - r * 2.05, cut + 0.02 * hh)]
+        sc.add(sleeve, tc, 'cloth', shade=(-0.04, 0.0), tension=0.42)
+        sc.detail([(x - r * 1.85, cut + 0.05 * hh), (x, cut + 0.02 * hh), (x + r * 1.85, cut + 0.05 * hh)],
+                  pal.cel_shadow(tc), 0.45)
+    sc.finish()
+
+
+def stick_fore(k: Kit, cv: Canvas, side: int, hand: str) -> None:
+    d, p, c = k.d, k.p, k.col
+    hh = p.hh
+    x = side * p.arm_x
+    y0 = p.shoulder_y - p.upper_len
+    y1 = y0 - p.fore_len
+    r = p.fore_w / 2
+    _, cover = _sleeves(d)
+    tc = c['top']
+    sc = Sculpt(k, cv)
+    draw_hand(k, sc, x, y1 + 0.01 * hh, -side, hand, r * 1.05)
+    color = tc if cover == 'long' else k.skin
+    _stick(sc, k, x, y0, y1 + 0.03 * hh, r, color, 'cloth' if cover == 'long' else 'skin', bottom_line=False)
+    if cover == 'long':
+        sc.add([(x - r * 1.25, y1 + 0.13 * hh), (x + r * 1.25, y1 + 0.13 * hh), (x + r * 1.3, y1 + 0.02 * hh),
+                (x - r * 1.3, y1 + 0.02 * hh)], pal.cel_shadow(tc) if d.top == 'hoodie' else tc, 'cloth',
+               shade=None, smooth=False)
+    elif cover == 'three_quarter':
+        cut = y0 - p.fore_len * 0.45
+        sc.add([(x - r * 1.5, y0 + 0.02 * hh), (x + r * 1.5, y0 + 0.02 * hh), (x + r * 2.0, cut),
+                (x - r * 2.0, cut)], tc, 'cloth', shade=(-0.04, 0.0), smooth=False)
+        sc.detail([(x - r * 1.9, cut + 0.03 * hh), (x + r * 1.9, cut + 0.03 * hh)], c['accent'], 0.7, smooth=False)
+    sc.finish()
 
 
 # --------------------------------------------------------------------------

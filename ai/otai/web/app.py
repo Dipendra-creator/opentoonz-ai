@@ -95,7 +95,7 @@ def rerender_job(job_id: str) -> dict:
 
 @app.get('/media/{pid}/{name}')
 def media(pid: str, name: str):
-    allowed = {'final.mp4', 'contact_sheet.png'}
+    allowed = {'final.mp4', 'contact_sheet.png', 'thumbnail.png', 'subtitles.srt'}
     if name not in allowed and not (name.startswith('cast_') and name.endswith('.png')):
         raise HTTPException(404)
     path = runner.studio.dir(pid) / 'render' / name
