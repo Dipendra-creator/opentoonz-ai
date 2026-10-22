@@ -30,7 +30,7 @@ INTERIORS = ['bedroom', 'living_room', 'kitchen', 'classroom', 'office', 'cafe',
              'shop', 'school_corridor', 'hospital']
 EXTERIORS = ['street', 'park', 'school_gate', 'rooftop', 'beach', 'village',
              'city', 'forest']
-ABSTRACT = ['speedlines', 'sparkle', 'gloom', 'plain', 'sunburst']
+ABSTRACT = ['speedlines', 'sparkle', 'gloom', 'plain', 'sunburst', 'bokeh']
 LOCATIONS = INTERIORS + EXTERIORS + ABSTRACT
 TIMES = ['day', 'evening', 'night']
 
@@ -627,7 +627,7 @@ def draw_location(pl: Plate, d: BackgroundDesign, rnd: random.Random) -> None:
 def _abstract(pl: Plate, loc: str, d: BackgroundDesign, rnd) -> None:
     base = pal.resolve(d.accent_color or d.wall_color, pal.CLOTH, {
         'speedlines': '#FFFFFF', 'sparkle': '#F8C8DC', 'gloom': '#3A2E5A',
-        'plain': '#F2EEE6', 'sunburst': '#FFD66B'}[loc])
+        'plain': '#F2EEE6', 'sunburst': '#FFD66B', 'bokeh': '#171226'}[loc])
     pl.rect(-PLATE_W / 2, -PLATE_H / 2, PLATE_W / 2, PLATE_H / 2, base, line=None)
     if loc == 'speedlines':
         for _ in range(150):
@@ -651,6 +651,20 @@ def _abstract(pl: Plate, loc: str, d: BackgroundDesign, rnd) -> None:
             x, y = rnd.uniform(-12, 12), rnd.uniform(-6.5, 6.5)
             r = rnd.uniform(0.1, 0.6)
             pl.ellipse(x, y, r, r, pal.with_alpha('#FFFFFF', rnd.randint(60, 160)), line=None)
+    elif loc == 'bokeh':
+        # dark void with out-of-focus lights (blurred in build_background)
+        light = pal.resolve(d.wall_color, pal.CLOTH, '#DCE4F0')
+        pl.grad_rect(-PLATE_W / 2, -PLATE_H / 2, PLATE_W / 2, PLATE_H / 2, '#06050B', base)
+        for _ in range(7):
+            x, y, r = rnd.uniform(-11, 11), rnd.uniform(-6, 6), rnd.uniform(1.6, 3.2)
+            pl.ellipse(x, y, r, r * 0.8, pal.with_alpha(light, rnd.randint(8, 18)), line=None)
+        for _ in range(46):
+            x, y = rnd.uniform(-12, 12), rnd.uniform(-6.6, 6.6)
+            r = rnd.uniform(0.22, 0.62)
+            # out-of-focus lights often come in small clusters
+            for _ in range(rnd.choice((1, 1, 2, 3))):
+                pl.ellipse(x, y, r, r * 0.55, pal.with_alpha(light, rnd.randint(50, 150)), line=None)
+                x, y, r = x + rnd.uniform(0.4, 0.9) * r * 2, y + rnd.uniform(-0.3, 0.3), r * rnd.uniform(0.5, 0.9)
     elif loc == 'gloom':
         pl.grad_rect(-PLATE_W / 2, -PLATE_H / 2, PLATE_W / 2, PLATE_H / 2, '#1E1830', base)
         for i in range(40):
@@ -681,6 +695,8 @@ def build_background(design: BackgroundDesign, out_dir: Path, level: str) -> dic
         # backgrounds stay a little softer and less saturated than characters
         img = ImageEnhance.Color(img).enhance(0.88)
         img = img.filter(ImageFilter.GaussianBlur(0.5))
+    elif design.location == 'bokeh':
+        img = img.filter(ImageFilter.GaussianBlur(0.1 * BG_DPI))
     out_dir.mkdir(parents=True, exist_ok=True)
     img.save(out_dir / ('%s.0001.png' % level), compress_level=4)
     return {'level': level, 'dpi': BG_DPI, 'size_in': [PLATE_W, PLATE_H],

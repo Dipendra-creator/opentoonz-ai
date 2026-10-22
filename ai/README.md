@@ -114,7 +114,19 @@ From `docs/research_youtube_retention.md`:
   `freeze` beats (freeze-frame + record scratch cold opens), `text_pop` kinetic words, `whip`
   transitions, titles that leave after 2.4 s
 - every render also writes `render/subtitles.srt` and `render/thumbnail.png` (most extreme
-  reaction close-up, boosted colour, up to 3 huge words; `make_thumbnail` tool for custom text)
+  reaction close-up, boosted colour, up to 3 huge words; `make_thumbnail` tool for custom text,
+  yellow `pop` or glowing `neon` letters)
+
+## Finish (lighting and line)
+
+- per-shot colour grades (`otai/render/grade.py`): `night`, `dream`, `warm`, `gloom`, `neon`.
+  The frame is desaturated, tinted and has its shadows lifted, while bright saturated pixels
+  (glowing eyes, screens, lamps) keep their colour and bloom; `dream` and `warm` add drifting
+  light motes. Subtitles, titles and text pops are drawn after the grade. Grades exist only in
+  the MP4, like transitions.
+- `bokeh` reaction backdrop: dark void with soft out-of-focus lights
+- `hypnotized` emotion: glowing ring eyes that bloom under dark grades
+- `line: fine` production setting: thin sketch-like character outlines (0.62x the bold ink)
 
 ## Package layout
 

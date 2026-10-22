@@ -76,11 +76,11 @@ def _scene(path: str, mtime: float) -> Scene:
 
 
 def render_chunk(tnz: str, out: str, start: int, end: int, size: tuple[int, int],
-                 transition: str, total: int, last: bool, crf: int, freezes=()) -> str:
+                 transition: str, total: int, last: bool, crf: int, freezes=(), grade: str = 'none') -> str:
     """Worker: render frames [start, end) of a saved scene to an MP4 chunk.
     Frames inside a freeze window repeat the window's first frame."""
     scene = _scene(tnz, os.path.getmtime(tnz))
-    comp = Compositor(scene, Path(tnz).parent, size=size, vignette=0.22)
+    comp = Compositor(scene, Path(tnz).parent, size=size, vignette=0.22, grade=grade)
     frames = []
     for f in range(start, end):
         src = f
@@ -229,7 +229,8 @@ def render_production(studio: Studio, pid: str, progress: Callable[[dict], None]
         for a in range(0, n, CHUNK):
             out = seg_dir / ('%s_%05d.mp4' % (s.id, a))
             jobs.append((timings[s.id]['tnz'], str(out), a, min(n, a + CHUNK), size, s.transition, n,
-                         s.id == last_id, crf, [tuple(x) for x in timings[s.id].get('freezes', [])]))
+                         s.id == last_id, crf, [tuple(x) for x in timings[s.id].get('freezes', [])],
+                         s.grade))
     total_frames = sum(timings[s.id]['frames'] for s in prod.shots)
     frames_done = 0
     report(phase='rendering', done=0, total=len(prod.shots), frames=0, total_frames=total_frames)

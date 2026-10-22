@@ -32,7 +32,9 @@ BODY_DPI = 240
 # Drawing vocabularies. Eye expressions with pupils exist once per look
 # direction (c centre, l/r left/right in rig space, u up, d down).
 EYE_LOOK_EXPRS = ['open', 'half', 'wide', 'angry', 'sad', 'sharp']
-EYE_STATIC_EXPRS = ['closed', 'happy', 'squeeze', 'blank', 'heart', 'blink']
+EYE_STATIC_EXPRS = ['closed', 'happy', 'squeeze', 'blank', 'heart', 'blink', 'hypno']
+# glowing trance eyes (bright and saturated, so colour grades make them glow)
+HYPNO_FILL, HYPNO_RING, HYPNO_CORE, HYPNO_GLOW = '#EEFA5C', '#9DC81A', '#E2F83A', '#E9FF4F'
 EYE_LOOKS = ['c', 'l', 'r', 'u', 'd']
 EYE_DRAWINGS = ['%s_%s' % (e, l) for e in EYE_LOOK_EXPRS for l in EYE_LOOKS] + EYE_STATIC_EXPRS
 BROW_DRAWINGS = ['neutral', 'raised', 'angry', 'sad', 'flat', 'skeptic']
@@ -69,6 +71,7 @@ class CharacterDesign:
     accessories: list[str] = field(default_factory=list)
     height: float = 1.0
     build: str = 'average'          # slim | average | broad
+    line: float = 1.0               # outline weight multiplier (0.62 = fine sketch lines)
 
     def resolved(self) -> dict:
         return {
@@ -148,7 +151,7 @@ def proportions(d: CharacterDesign) -> Proportions:
         # stick limbs: constant thin width for both segments of an arm or leg
         dims = dict(upper_w=0.095 * limb, fore_w=0.095 * limb, thigh_w=0.115 * limb, shin_w=0.115 * limb,
                     hand_len=0.21 * limb, shoe_len=0.40 * limb, shoe_h=0.16 * limb, neck_w=0.08 * limb)
-        lw = 0.030 * u
+        lw = 0.030 * u * d.line
     else:
         f = {'shoulder': 0.05, 'chest': 0.20, 'waist': 0.34, 'crotch': 0.44, 'knee': 0.71}
         sx = (0.55 if child else (0.78 if male else 0.62)) * build
@@ -159,7 +162,7 @@ def proportions(d: CharacterDesign) -> Proportions:
                     thigh_w=(0.34 if male else 0.32) * limb, shin_w=0.24 * limb,
                     hand_len=min(0.36 * hh, 0.065 * H), shoe_len=0.45 * limb, shoe_h=0.18 * limb,
                     neck_w=(0.17 if male else 0.13) * hh)
-        lw = 0.018 * u
+        lw = 0.018 * u * d.line
     shoulder_y = chin - f['shoulder'] * body - (0.04 if toon else 0.07) * hh
     crotch_y = chin - f['crotch'] * body
     knee_y = chin - f['knee'] * body
@@ -359,7 +362,10 @@ def draw_eye(hp: HeadPainter, cv: Canvas, side: int, variant: str, look: str = '
     if variant in ('angry', 'sharp'):
         rx, ry = rx * 0.85, ry * 0.85
     iris_canvas = Canvas(cv.w, cv.h, cv.ss, (cv.ox, cv.oy))
-    if variant == 'heart':
+    if variant == 'hypno':
+        hypno_eye(iris_canvas, *hp.P(ir_x, ir_y), rx * U * 1.15, ry * U * 1.05, lw, pal.darken(HYPNO_RING, 0.3),
+                  halo=False)
+    elif variant == 'heart':
         hx, hy = hp.P(ir_x, ir_y)
         iris_canvas.fill(_heart_path(hx, hy, rx * U * 1.1), '#F05A8C')
         iris_canvas.fill(_heart_path(hx - rx * U * 0.25, hy - ry * U * 0.25, rx * U * 0.3), '#FFC2D6')
@@ -427,6 +433,9 @@ def _draw_dot_eye(hp: HeadPainter, cv: Canvas, side: int, variant: str) -> None:
     if variant == 'heart':
         cv.fill(_heart_path(x, y, w * 0.9 * U), '#E8457A')
         return
+    if variant == 'hypno':
+        hypno_eye(cv, x, y, w * 0.85 * U * sc, h * 0.75 * U, lw, ink)
+        return
     rx, ry = w * 0.5 * U * sc, h * 0.5 * U
     cv.fill(VPath().ellipse(x, y, rx, ry), ink)
     cv.fill(VPath().ellipse(x - rx * 0.3, y - ry * 0.35, rx * 0.32, ry * 0.25), '#FFFFFF')
@@ -439,6 +448,22 @@ def _draw_dot_eye(hp: HeadPainter, cv: Canvas, side: int, variant: str) -> None:
         lid = [hp.P(cx - side * w * 0.9, cy - 0.65 * h), hp.P(cx + side * w * 0.9, cy - 0.2 * h),
                hp.P(cx + side * w * 0.9, cy - 1.0 * h), hp.P(cx - side * w * 0.9, cy - 1.0 * h)]
         cv.fill(VPath().poly(lid), hp.skin)
+
+
+def hypno_eye(cv: Canvas, x: float, y: float, rx: float, ry: float, lw: float, ink: str,
+              halo: bool = True) -> None:
+    """Glowing trance eye centred on pixel (x, y): soft halo, bright disc,
+    concentric rings and a hot core."""
+    if halo:
+        for k, a in ((1.55, 26), (1.3, 44)):
+            cv.fill(VPath().ellipse(x, y, rx * k, ry * k), pal.with_alpha(HYPNO_GLOW, a))
+    disc = VPath().ellipse(x, y, rx, ry)
+    cv.fill(disc, HYPNO_FILL)
+    for k in (0.74, 0.47):
+        cv.stroke(VPath().ellipse(x, y, rx * k, ry * k), HYPNO_RING, lw * 0.7)
+    cv.fill(VPath().ellipse(x, y, rx * 0.2, ry * 0.2), HYPNO_CORE)
+    cv.stroke(VPath().ellipse(x, y, rx * 0.2, ry * 0.2), HYPNO_RING, lw * 0.5)
+    cv.stroke(disc, ink, lw * 0.85)
 
 
 def _heart_path(cx: float, cy: float, s: float) -> VPath:
@@ -1037,8 +1062,10 @@ def drawing_id(manifest: dict, part: str, name: str = '', view: str = 'front') -
     """1-based frame id of a named drawing of a part."""
     vi = VIEWS.index(view)
     if part in _LISTS:
-        names = _LISTS[part]
-        return vi * len(names) + names.index(name) + 1
+        # the rig's own list: rigs built before a drawing was added keep their numbering
+        names = manifest.get('drawings', {}).get(part) or _LISTS[part]
+        idx = names.index(name) if name in names else 0
+        return vi * len(names) + idx + 1
     if part in _VIEW_PARTS:
         # rigs built before a part gained a second view only have one drawing
         if manifest['parts'].get(part, {}).get('count', 2) < 2:

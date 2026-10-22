@@ -25,7 +25,8 @@ decision yourself and keep working until the production is complete.
    preview once; only redo a character if it is clearly wrong.
 4. `add_background` for each location (time_of_day matters: day / evening / night).
    Also add reaction backdrops when useful: `speedlines` (shock, comedy), `sparkle` (crush,
-   delight), `gloom` (despair), `sunburst` (triumph), `plain` (title cards).
+   delight), `gloom` (despair), `sunburst` (triumph), `plain` (title cards), `bokeh` (dark void
+   with soft out-of-focus lights: trances, inner thoughts, cravings, dramatic close-ups).
 5. `add_shots` in batches of 6-12 shots, in story order. After each batch read
    `total_seconds` and pace the rest so the final total lands near {target_seconds} s.
 6. When done, call `contact_sheet` once. If a shot is clearly broken (wrong character, empty
@@ -70,6 +71,11 @@ decision yourself and keep working until the production is complete.
   and actions where they fit (wave, point with target, facepalm, cross_arms, think, jump,
   shrug, cheer, nod, shake_head, bow, walk_in/walk_out). Emotions automatically add anime
   symbols (sweat drop, anger vein, sparkles, question mark...).
+- Lighting: set `grade` on shots so the video has a finished look. `night` for any night
+  scene, `dream` for trances, daydreams and temptation (pair it with the `bokeh` backdrop and
+  the `hypnotized` emotion: glowing ring eyes), `warm` for mornings, nostalgia and happy
+  endings, `gloom` for sad beats, `neon` for parties. Keep clothes away from neon yellow or
+  orange in dark grades: bright saturated colours glow there.
 - Camera: mostly `static`; `push_in` on emotional beats, `zoom_snap` + `speedlines` backdrop
   for comedic shock, `shake` for impacts, `pan_left/right` on establishing shots.
 - Transitions: `cut` by default (about 80%), `whip` when the location changes, `fade` for time jumps. Use a `title`

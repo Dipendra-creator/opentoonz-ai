@@ -108,7 +108,7 @@ class Studio:
             eye_color=spec.eye_color, top=spec.top, top_color=spec.top_color, bottom=spec.bottom,
             bottom_color=spec.bottom_color, shoe_color=spec.shoe_color,
             accent_color=spec.accent_color, accessories=list(spec.accessories),
-            height=spec.height, build=spec.build)
+            height=spec.height, build=spec.build, line={'bold': 1.0, 'fine': 0.62}[prod.settings.line])
         folder = self.char_dir(pid, spec.name)
         for old in folder.glob('*.png') if folder.exists() else []:
             old.unlink()
@@ -322,7 +322,7 @@ class Studio:
         frame = int(min(max(at, 0.0), 1.0) * (timing['frames'] - 1)) if at <= 1.0 else int(at * prod.settings.fps)
         frame = min(frame, timing['frames'] - 1)
         out = self.dir(pid) / 'render' / ('preview_%s_%04d.png' % (shot_id, frame))
-        Compositor(scene, scene.path.parent, size=size, vignette=0.22).render_png(frame, out)
+        Compositor(scene, scene.path.parent, size=size, vignette=0.22, grade=shot.grade).render_png(frame, out)
         return out
 
     def contact_sheet(self, pid: str, cols: int = 4, tile=(384, 216)) -> Path:
@@ -335,7 +335,8 @@ class Studio:
         for i, shot in enumerate(shots):
             scene, timing = self.scene_for(prod, shot)
             mid = timing['frames'] // 2
-            img = Compositor(scene, scene.path.parent, size=tile, vignette=0.22).render(mid).convert('RGB')
+            img = Compositor(scene, scene.path.parent, size=tile, vignette=0.22,
+                             grade=shot.grade).render(mid).convert('RGB')
             x, y = (i % cols) * tile[0], (i // cols) * (tile[1] + 28)
             sheet.paste(img, (x, y))
             label = '%s  %.1fs  %s' % (shot.id, timing['seconds'], shot.shot_type)
@@ -344,15 +345,17 @@ class Studio:
         sheet.save(out)
         return out
 
-    def thumbnail(self, pid: str, shot_id: str | None = None, text: str = '', at: float = 0.55) -> Path:
+    def thumbnail(self, pid: str, shot_id: str | None = None, text: str = '', at: float = 0.55,
+                  style: str = 'auto') -> Path:
         """YouTube thumbnail: the most extreme reaction close-up, boosted colour,
-        and up to 3 huge words."""
+        and up to 3 huge words. ``style`` 'pop' (yellow) or 'neon' (glowing);
+        'auto' picks neon for dark graded shots."""
         from PIL import ImageEnhance
         from ..art.text import render_caption
         prod = self.load(pid)
         if not prod.shots:
             raise ValueError('production has no shots')
-        strong = {'shocked': 5, 'surprised': 4, 'scared': 4, 'furious': 4, 'crying': 4, 'angry': 3,
+        strong = {'hypnotized': 5, 'shocked': 5, 'surprised': 4, 'scared': 4, 'furious': 4, 'crying': 4, 'angry': 3,
                   'love': 3, 'embarrassed': 3, 'laugh': 2, 'excited': 2}
         close = {'extreme_closeup': 3, 'closeup': 2, 'medium': 1}
 
@@ -367,13 +370,16 @@ class Studio:
             if col.name in ('captions', 'title', 'text_pops'):
                 col.cells.clear()
         frame = min(timing['frames'] - 1, int(at * (timing['frames'] - 1)))
-        img = Compositor(scene, scene.path.parent, size=(1280, 720), vignette=0.35).render(frame).convert('RGB')
+        img = Compositor(scene, scene.path.parent, size=(1280, 720), vignette=0.35,
+                         grade=shot.grade).render(frame).convert('RGB')
         img = ImageEnhance.Color(img).enhance(1.3)
         img = ImageEnhance.Contrast(img).enhance(1.1)
         words = ' '.join((text or prod.settings.title).split()[:3]).upper()
         if words:
             tmp = self.dir(pid) / 'render' / '_thumb_text.png'
-            render_caption(words, (1180, 300), tmp, 'pop')
+            if style == 'auto':
+                style = 'neon' if shot.grade in ('night', 'dream', 'neon') else 'pop'
+            render_caption(words, (1180, 300), tmp, style)
             label = Image.open(tmp).convert('RGBA').rotate(4, expand=True, resample=Image.Resampling.BICUBIC)
             base = img.convert('RGBA')
             base.alpha_composite(label, (int((1280 - label.width) / 2), 720 - label.height + 20))

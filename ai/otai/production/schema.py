@@ -13,7 +13,7 @@ Emotion = Literal[
     'neutral', 'happy', 'laugh', 'excited', 'sad', 'crying', 'angry', 'furious',
     'surprised', 'shocked', 'scared', 'nervous', 'embarrassed', 'annoyed',
     'confused', 'thinking', 'love', 'smug', 'determined', 'tired', 'sleepy',
-    'idea', 'disgusted']
+    'idea', 'disgusted', 'hypnotized']
 Action = Literal[
     'none', 'wave', 'point', 'nod', 'shake_head', 'jump', 'shrug', 'facepalm',
     'cross_arms', 'think', 'hands_on_hips', 'cheer', 'fist_pump', 'bow', 'shiver',
@@ -24,6 +24,7 @@ CameraMove = Literal['static', 'push_in', 'pull_out', 'pan_left', 'pan_right',
                      'shake', 'zoom_snap', 'tilt_up']
 Transition = Literal['cut', 'fade', 'fade_white', 'dissolve', 'flash', 'whip']
 Mood = Literal['auto', 'comedy', 'upbeat', 'warm', 'emotional', 'tense', 'none']
+Grade = Literal['none', 'night', 'dream', 'warm', 'gloom', 'neon']
 Sfx = Literal['pop', 'boing', 'whoosh', 'swish', 'boom', 'thud', 'ding', 'twinkle', 'scratch',
               'slide_up', 'slide_down', 'drip', 'tap']
 
@@ -40,6 +41,8 @@ class Settings(BaseModel):
     target_minutes: float = Field(2.0, ge=0.2, le=10.0)
     music: Mood = Field('auto', description="background music mood; 'auto' picks by style")
     sfx: bool = True
+    line: Literal['bold', 'fine'] = Field('bold', description="character outline weight: 'bold' thick ink, "
+                                                              "'fine' thin sketch-like lines")
 
     @property
     def size(self) -> tuple[int, int]:
@@ -125,6 +128,10 @@ class Shot(BaseModel):
     beats: list[Beat] = Field(..., min_length=1)
     transition: Transition = 'cut'
     title: Optional[str] = Field(None, description='on-screen title card text (e.g. "The next day...")')
+    grade: Grade = Field('none', description='lighting/colour grade of the finished shot: night (cool, dim), '
+                                             'dream (violet trance + light motes), warm (golden hour), '
+                                             'gloom (grey-blue), neon (magenta party); bright saturated '
+                                             'colours such as hypnotized eyes glow')
     music: Optional[Mood] = Field(None, description='override the production music mood from this shot on')
     notes: str = ''
 

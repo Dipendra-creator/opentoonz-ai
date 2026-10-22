@@ -60,12 +60,14 @@ EMOTIONS = {
     'sleepy': ('closed', 'neutral', 'rest', 'zzz', None),
     'idea': ('wide', 'raised', 'smile', 'idea', None),
     'disgusted': ('sharp', 'angry', 'wavy', None, None),
+    'hypnotized': ('hypno', 'raised', 'smile', None, None),
 }
 EMOTION_LOOK = {'embarrassed': 'd', 'thinking': 'u', 'annoyed': 'away', 'smug': 'away', 'tired': 'd'}
 EMOTION_ACTION = {
     'surprised': 'take', 'shocked': 'big_take', 'excited': 'bounce', 'laugh': 'laugh',
     'nervous': 'shiver', 'scared': 'shiver', 'furious': 'shiver', 'sad': 'slump',
     'crying': 'slump', 'confused': 'head_tilt', 'idea': 'hop', 'thinking': 'think',
+    'hypnotized': 'head_tilt',
 }
 LOUD = {'angry', 'furious', 'shocked'}
 HAPPY = {'happy', 'laugh', 'excited', 'love'}

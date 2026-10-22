@@ -65,6 +65,8 @@ class _ImageCache:
 
 # shared by every Compositor in a process, so render chunks reuse decoded levels
 _PROCESS_CACHE = _ImageCache(max_items=1500)
+# text columns drawn after the colour grade, so subtitles keep their colours
+OVERLAY_COLUMNS = ('captions', 'title', 'text_pops')
 
 
 def _vignette(size: tuple[int, int], strength: float) -> Image.Image:
@@ -83,13 +85,14 @@ def _vignette(size: tuple[int, int], strength: float) -> Image.Image:
 class Compositor:
     def __init__(self, scene: Scene, scene_dir: Path | None = None,
                  size: tuple[int, int] | None = None,
-                 background=(255, 255, 255), vignette: float = 0.0) -> None:
+                 background=(255, 255, 255), vignette: float = 0.0, grade: str = 'none') -> None:
         self.scene = scene
         self.scene_dir = Path(scene_dir or (scene.path.parent if scene.path else '.'))
         self.size = size or tuple(scene.camera.res)
         self.background = background
         self.cache = _PROCESS_CACHE
         self._vignette = _vignette(self.size, vignette) if vignette > 0 else None
+        self.grade = grade
         self._last_sig = None
         self._last_frame: Image.Image | None = None
 
@@ -101,7 +104,7 @@ class Compositor:
         return np.array([[s, 0, w / 2], [0, -s, h / 2], [0, 0, 1.0]])
 
     def layers(self, frame: int):
-        """Yields (path, matrix_from_image_px_to_screen, opacity) bottom-up."""
+        """Yields (path, matrix_from_image_px_to_screen, dpi, opacity, overlay) bottom-up."""
         scene = self.scene
         cache: dict = {}
         cam = scene.placement('Camera1', frame, cache)
@@ -121,27 +124,35 @@ class Compositor:
                 continue
             path = level.frame_path(self.scene_dir, cell[1])
             world = scene.placement('Col%d' % (i + 1), frame, cache)
-            yield path, view @ world, level.dpi, col.opacity
+            yield path, view @ world, level.dpi, col.opacity, col.name in OVERLAY_COLUMNS
 
     def render(self, frame: int) -> Image.Image:
+        from . import grade as grading
         items = []
-        for path, m, dpi, opacity in self.layers(frame):
+        for path, m, dpi, opacity, overlay in self.layers(frame):
             k = INCH / dpi
             # determinant -> pixel scale on screen, used to pick a mipmap
             scale = math.sqrt(abs(np.linalg.det(m[:2, :2]))) * k
             mip = 0
             while scale * (2 ** (mip + 1)) <= 1.0 and mip < 5:
                 mip += 1
-            items.append((path, m, k, mip, opacity))
+            items.append((path, m, k, mip, opacity, overlay))
         sig = tuple((str(p), np.round(m, 4).tobytes(), mip, op)
-                    for p, m, k, mip, op in items)
+                    for p, m, k, mip, op, _ in items)
+        if grading.animated(self.grade):
+            sig += (frame,)
         if sig == self._last_sig and self._last_frame is not None:
             return self._last_frame
         canvas = Image.new('RGBA', self.size, self.background + (255,))
-        for path, m, k, mip, opacity in items:
-            self._draw(canvas, path, m, k, mip, opacity)
+        for path, m, k, mip, opacity, overlay in items:
+            if not overlay:
+                self._draw(canvas, path, m, k, mip, opacity)
         if self._vignette is not None:
             canvas.alpha_composite(self._vignette)
+        canvas = grading.apply(canvas, self.grade, frame)
+        for path, m, k, mip, opacity, overlay in items:
+            if overlay:
+                self._draw(canvas, path, m, k, mip, opacity)
         self._last_sig, self._last_frame = sig, canvas
         return canvas
 

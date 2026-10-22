@@ -183,6 +183,11 @@ def draw_eye(th: ToonHead, cv: Canvas, side: int, expr: str, look: str = 'c') ->
             o = pts[-1] if side > 0 else pts[0]
             th.stroke(cv, [o, (o[0] + side * 0.035 * U, o[1] - 0.02 * U)], lw * 0.9, lw * 0.2, lw * 0.9)
         return
+    if expr == 'hypno':
+        from .character import hypno_eye
+        x, y = th.P(cx, cy)
+        hypno_eye(cv, x, y, w / 2 * 1.06 * U, h / 2 * 1.06 * U, lw, INK)
+        return
     scale = 1.12 if expr in ('wide', 'blank') else 1.0
     pts = _superellipse(cx, cy, w / 2 * scale, h / 2 * scale, n=2.4)
     eye = VPath().poly([th.P(x, y) for x, y in pts])

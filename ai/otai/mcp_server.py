@@ -101,6 +101,11 @@ def studio_capabilities() -> dict:
         'shot_types': ['wide', 'full', 'medium', 'two_shot', 'closeup', 'extreme_closeup'],
         'camera_moves': ['static', 'push_in', 'pull_out', 'pan_left', 'pan_right', 'shake', 'zoom_snap', 'tilt_up'],
         'transitions': ['cut', 'fade', 'fade_white', 'dissolve', 'flash', 'whip (location changes)'],
+        'grades': {'none': 'as drawn', 'night': 'cool dim moonlight; screens and glowing eyes bloom',
+                   'dream': 'violet trance light, strong glow, drifting light motes',
+                   'warm': 'golden hour / nostalgia, a few warm motes', 'gloom': 'grey-blue, flat, sad',
+                   'neon': 'dark magenta party light, saturated, heavy bloom'},
+        'line_weights': {'bold': 'thick ink outlines (default)', 'fine': 'thin sketch-like outlines'},
         'beat_camera': {'punch_in': 'snap ~120% onto the speaker for punchlines',
                         'freeze': 'freeze-frame + record scratch for the whole beat'},
         'beat_text_pop': '1-4 big kinetic words that spring onto the screen (2-3 per minute)',
@@ -137,11 +142,13 @@ def create_production(title: str, story: str = '', style: Literal['anime', 'cart
                       resolution: Literal['480p', '720p', '1080p'] = '720p',
                       language: str = 'en', target_minutes: float = 2.0,
                       tts_engine: Literal['edge', 'sapi', 'none'] = 'edge',
-                      subtitles: bool = True, narrator_voice: Optional[str] = None) -> dict:
-    """Creates a production folder. target_minutes is 0.2-10. Returns production_id."""
+                      subtitles: bool = True, narrator_voice: Optional[str] = None,
+                      line: Literal['bold', 'fine'] = 'bold') -> dict:
+    """Creates a production folder. target_minutes is 0.2-10. line: character outline weight
+    ('fine' = thin sketch-like lines; set it before adding characters). Returns production_id."""
     p = studio().create(title, story=story, style=style, resolution=resolution, language=language,
                         target_minutes=target_minutes, tts_engine=tts_engine, subtitles=subtitles,
-                        narrator_voice=narrator_voice)
+                        narrator_voice=narrator_voice, line=line)
     return {'production_id': p.id, 'folder': str(studio().dir(p.id))}
 
 
@@ -227,10 +234,11 @@ async def contact_sheet(production_id: str) -> list:
 
 @mcp.tool()
 async def make_thumbnail(production_id: str, text: str = '', shot_id: Optional[str] = None,
-                         at: float = 0.55) -> list:
+                         at: float = 0.55, style: Literal['auto', 'pop', 'neon'] = 'auto') -> list:
     """YouTube thumbnail (1280x720): picks the most extreme reaction close-up unless shot_id is
-    given, boosts colour and adds up to 3 huge words (text; defaults to the title)."""
-    path = await _bg(studio().thumbnail, production_id, shot_id, text, at)
+    given, applies the shot's grade, boosts colour and adds up to 3 huge words (text; defaults to
+    the title) in yellow 'pop' or glowing 'neon' letters ('auto': neon on dark grades)."""
+    path = await _bg(studio().thumbnail, production_id, shot_id, text, at, style)
     return [str(path), _image(path, 960)]
 
 

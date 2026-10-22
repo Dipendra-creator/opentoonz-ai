@@ -15,7 +15,7 @@ import tempfile
 import textwrap
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont, features
+from PIL import Image, ImageDraw, ImageFilter, ImageFont, features
 
 from ..config import font_path
 
@@ -48,23 +48,37 @@ def render_caption(text: str, size: tuple[int, int], out: Path, style: str = 'di
     out.parent.mkdir(parents=True, exist_ok=True)
     w, h = size
     fill, outline = {'dialogue': ('#FFFFFF', '#1B1B24'), 'narration': ('#FFE9A8', '#1B1B24'),
-                     'title': ('#FFFFFF', '#1B1B24'), 'pop': ('#FFE14D', '#1B1B24')}[style]
-    px = int(h * {'title': 0.32, 'pop': 0.5}.get(style, 0.25))
+                     'title': ('#FFFFFF', '#1B1B24'), 'pop': ('#FFE14D', '#1B1B24'),
+                     'neon': ('#B7C3FF', '#4B2A8C')}[style]
+    px = int(h * {'title': 0.32, 'pop': 0.5, 'neon': 0.5}.get(style, 0.25))
     script = script_of(text)
     if script == 'devanagari' and not features.check('raqm') and os.name == 'nt':
         render_gdi([(text, w, h, px, fill, outline, str(out))])
         return out
-    kind = {'latin': 'title' if style in ('title', 'pop') else 'latin', 'cjk': 'cjk',
+    kind = {'latin': 'title' if style in ('title', 'pop', 'neon') else 'latin', 'cjk': 'cjk',
             'devanagari': 'devanagari'}[script]
     font = ImageFont.truetype(font_path(kind), px)
     img = Image.new('RGBA', (w, h), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
+    if style in ('pop', 'neon'):  # shrink big words to fit, leaving room for the shadow or glow
+        while px > 24:
+            x0, y0, x1, y1 = d.multiline_textbbox((w / 2, h / 2), text, font=font, anchor='mm', align='center',
+                                                  spacing=int(px * 0.2), stroke_width=max(2, px // 7))
+            if x1 - x0 <= w - px * 0.7 and y1 - y0 <= h - px * 0.7:
+                break
+            px = int(px * 0.92)
+            font = ImageFont.truetype(font_path(kind), px)
     if style == 'pop':  # drop shadow under kinetic text
         d.multiline_text((w / 2 + px * 0.06, h / 2 + px * 0.08), text, font=font, fill='#00000090', anchor='mm',
                          align='center', spacing=int(px * 0.2), stroke_width=max(3, px // 7), stroke_fill='#00000090')
     d.multiline_text((w / 2, h / 2), text, font=font, fill=fill, anchor='mm', align='center',
                      spacing=int(px * 0.2), stroke_width=max(2, px // (7 if style == 'pop' else 9)),
                      stroke_fill=outline)
+    if style == 'neon':  # violet glow behind the letters
+        glow = Image.new('RGBA', (w, h), '#B44CFF')
+        glow.putalpha(img.getchannel('A').filter(ImageFilter.GaussianBlur(px * 0.16)).point(lambda v: min(255, v * 2)))
+        glow.alpha_composite(img)
+        img = glow
     img.save(out)
     return out
 
